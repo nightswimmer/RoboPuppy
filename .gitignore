@@ -1,6 +1,9 @@
 # Generated SolidCraft command scripts (rebuild with: node cad/scripts/gen_blockout.js)
-cad/robot/build/
+cad/*/build/
 
 # SolidCraft lock and backup files
 .~*.lock
 *.sc.bak
+
+# Production files (DXF, 3MF, STEP): exported only when the design is complete
+cad/*/export/

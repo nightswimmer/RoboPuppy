@@ -2,10 +2,10 @@
 
 A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts and designed in SolidCraft.
 
-![Block-out, side view](cad/robot/robot_blockout_side.png)
+![Side view](cad/robot/robot_side.png)
 
 ## Status
-Concept stage. The actuators are chosen and a whole-robot block-out confirms the proportions. No parts are ready to manufacture yet.
+First detailed design pass. The whole robot is modelled as an articulated assembly with a detailed torso and four detailed legs. The head, neck and tail are still placeholders, and nothing has been built yet.
 
 ## Design targets
 - Torso about 60 cm long, with the rest scaled to a dog of that size
@@ -20,30 +20,38 @@ Concept stage. The actuators are chosen and a whole-robot block-out confirms the
 | 12 leg joints | RobStride 01 quasi-direct-drive (17 N·m peak, 380 g, CAN, 36 V) |
 | Head and tail | serial bus servos (to be finalised) |
 
-Each leg has an abduction actuator on the torso, a hip-pitch actuator in a carrier, and a knee actuator mounted at the hip that drives the knee through a 1.5:1 belt inside the thigh.
+## Design
+![Hip detail](cad/robot/robot_hip_detail.png)
 
-## Block-out dimensions
+- **Legs:** an abduction actuator on the torso, a hip-pitch actuator in a printed carrier, and a knee actuator at the hip that drives the knee through a 1.5:1 HTD 5M belt between two laser-cut thigh plates. The shank, knee pulley and foot core are one printed part.
+- **Torso:** each pair of abduction actuators is clamped between two aluminium plates. A printed belly pan forms the central bay and an aluminium deck closes the top.
+
 | Measure | Value |
 |---|---|
 | Torso structure length | 600 mm |
 | Hip spacing, front to rear | 420 mm |
-| Width | 285 mm |
-| Thigh / shank | 240 mm / 240 mm |
-| Back height, standing | about 475 mm |
-| Top of head | about 630 mm |
+| Width | 323 mm |
+| Thigh / shank | 242 mm / 242 mm |
+| Back height, standing | about 470 mm |
+| Estimated mass | 10.5–11.2 kg |
 
 ## Repository
 - `cad/actuators/` – RobStride 01 reference model
-- `cad/leg/` – single-leg concept
-- `cad/robot/` – whole-robot block-out and renders
-- `cad/scripts/` – script that generates the block-out
+- `cad/leg/` – detailed leg
+- `cad/robot/` – whole-robot model and renders
+- `cad/scripts/` – generator scripts
 
-To rebuild the block-out after changing the layout numbers in the script:
+The models are generated from scripts. To rebuild after changing a dimension:
 
 ```
-node cad/scripts/gen_blockout.js
-solidcraft-cli run cad/robot/build/robot_blockout_all.json --save cad/robot/robot_blockout.sc
+node cad/scripts/gen_leg.js
+solidcraft-cli run cad/leg/build/leg_detailed.json --save cad/leg/leg_detailed.sc
+
+node cad/scripts/gen_robot.js
+solidcraft-cli run cad/robot/build/robot.json --save cad/robot/robot.sc
 ```
+
+Production files (cut files, print files, STEP) are not stored in the repository. They will be exported once the design is complete.
 
 ## Licence
 See [LICENSE](LICENSE).

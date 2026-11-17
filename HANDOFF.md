@@ -1,36 +1,51 @@
 # Handoff – what's left to do
 
-## Next step: detail the leg into real parts
-Proposed choices, not yet confirmed by the owner (ask before starting):
-- Thigh plates: laser-cut 3 mm aluminium or carbon (they carry the actuator bolt patterns and belt tension).
-- Hip carrier, plate spacers, shank, pulleys: 3D printed.
-- Knee drive: HTD 5M belt, 15 mm wide, 20:30 teeth. Thigh length may move a few mm from 240 to suit a standard belt length (about 605 mm needed at 240; 600 and 610 are common).
-- Knee joint: two flanged ball bearings on a steel shoulder bolt.
-- Foot: printed core with a TPU cap.
+## Open question for the owner
+- Remove the superseded files? (`cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.sc` and its two renders, `cad/scripts/gen_blockout.js`.) Asked, not yet answered.
 
-Open problems in the leg concept:
-- The shank lines up with the belt cavity and would hit the belt when folded tightly. Offset the shank or limit the fold angle.
-- The hip carrier is a thin ring plus a back plate with no gussets. It needs a real shape that bolts to the hip-pitch actuator's rear face (6× M3 on Ø73) and leaves a slot for the radial XT30 plug.
-- No belt tensioner yet.
-- Joint limits are placeholders (abduction ±45°, hip ±120°, knee ±150°).
+## Leg
+- **Pulley teeth:** model the HTD 5M tooth profile on the hip pulley (24T) and the knee pulley on the shank (36T). Until then those two parts are not printable as working parts. This blocks a test print of the knee drive.
+- **Belt:** not modelled as a body; belt clearances come from hand calculation.
+- **Flush fasteners on the inner thigh face:** only 1.5–3.5 mm separates it from the torso. Standoff screws, the tensioner screw and the knee axle end screw must be countersunk; the countersinks are not modelled.
+- **Carrier:** first shape, no stress check, no fillets. Flange screws go in from inside the cup before the hip-pitch actuator is fitted.
+- **Bearings, screws, cable routing:** not modelled.
+- **Shank blade** (30 × 13 mm printed section): hand estimate about 18 MPa bending at 150 N; consider a carbon tube insert.
+- Confirm the plate DXFs serve all four legs (shapes are mirror-symmetric in the model; not checked hole by hole).
 
-RobStride 01 mounting facts to design against:
+## Torso
+- **Joints between parts:** nothing fastens the belly pan, mid frames, bulkheads and deck to each other yet. Add brackets or tabs.
+- **Cut files:** none for bulkheads, mid frames or deck. Their outline is a union of two shapes, so the DXF needs a trimmed outline.
+- **Abduction actuator plugs:** they point up into about 1 mm of clearance under the deck. Find a cable route (deck cut-outs, or rotate the actuators).
+- **Bulkhead screws:** must be countersunk; the carrier face is 1 mm from the bulkhead.
+- **Deck:** 300 g solid; add lightening cut-outs and access to the bay.
+- **Battery:** keep-out is 200 × 110 × 72 mm; check a real 10S2P cell arrangement against the bay (258 long, 114 wide at the top, about 150 at mid-height, about 77 high).
+- **Bay access:** decide how the battery goes in and out.
+
+## Head, neck, tail
+- Choose the exact servos, model them, design the linkages and mounts.
+- The neck tilt servo placeholder sits between the front hip carriers and may be hit at large abduction angles; check with the real servo shape.
+
+## Checks still to run
+- Clearance sweeps on the other three legs (only front-left was swept fully; rear-left partly).
+- Hip pitch sweeps ran out of time budget at 114° back and 44° forward without finding a collision; rerun with a larger budget to find the true limits.
+- Set real joint limits from the sweeps. Found so far on front-left in the standing pose: inward 38° (opposite leg), outward 36° (carrier meets the deck spine), knee fold 152° (blade meets a spacer; limit set to 145°).
+- A rear leg reaching forward about 45° from standing touches the front leg's shank. This is a gait-planning limit.
+
+## Later
+- Electronics: main computer, CAN interface, IMU, power distribution, battery pack.
+- Confirm the actuator order and check current prices.
+- Recheck mass once pulley teeth, brackets and real servos exist (current estimate 10.5–11.2 kg).
+
+## Reference: RobStride 01 mounting facts
 - Output flange Ø30: 6× M4 (9 mm deep) and 3× Ø4 pin holes on Ø24.
 - Fixed Ø43 pilot ring, 3.5 mm high, around the flange; flange face is 0.5 mm proud of it.
 - Housing: 9× M3 on the front face and 6× M3 on the rear, all on Ø73, 8 mm deep. No side holes.
 - Rear cover Ø63 × 8.5 mm; three screw heads stand 3 mm proud on the rear annulus.
-- Plug exits radially from the rear cover; the keep-out size in the reference model is a guess.
-- The official STEP and manual are at github.com/RobStride/Product_Information (not stored in this repo; licence not checked).
+- Plug exits radially from the rear cover; its clearance is not documented.
+- Official STEP and manual: github.com/RobStride/Product_Information (not stored here; licence not checked).
 
-## After the leg
-- Torso: real bulkheads, side plates and decks; mounts for four abduction actuators; battery and electronics bay; the narrow spine sections that carry the neck and tail past the hips.
-- Head, neck and tail: choose the exact servos, model them, design the linkages.
-- Run a collision check across the joint ranges on the whole robot.
-- Choose electronics: main computer, CAN interface, IMU, power distribution, battery pack (10S, 180–360 Wh).
-- Confirm the actuator order and check current prices.
-- Recheck the mass budget once real parts exist (target about 11 kg).
-
-## Unverified estimates to revisit
+## Unverified estimates
 - Knee torque need (about 6 N·m continuous, 15 N·m peak) is a hand calculation, not a simulation.
+- Abduction torque is about 5 N·m at a 100 N foot load (foot is 52 mm outboard of the axis), against a 6 N·m rating.
 - Power figures are scaled from commercial robots.
-- Head and tail servo prices were not looked up.
+- Printed-part masses assume half to nine-tenths of solid volume.

@@ -6,8 +6,9 @@ const path = require("path");
 
 // ---- layout numbers (mm) ----
 const HIP_X = 210;        // hip pitch axis, fore/aft from centre
-const ABD_Y = 60;         // abduction axis, lateral from centreline
-const L_THIGH = 240, L_SHANK = 240;
+const ABD_Y = 42;         // abduction axis, lateral from centreline (actuators nearly touch at the centre)
+const TORSO_W = 163;      // torso width: must stay inside the thigh planes (ABD_Y + 42 each side)
+const L_THIGH = 242, L_SHANK = 242;
 const STAND_HIP = 35, STAND_KNEE = -70; // standing pose, degrees
 
 const legs = [
@@ -31,14 +32,14 @@ feats.push({ command: "parameters.add", params: { name: "L_thigh", expression: L
 feats.push({ command: "parameters.add", params: { name: "L_shank", expression: L_SHANK + " mm" } });
 
 // ---- torso ----
-box("Deck_Core", "TorsoDeck", "new", 326, 208, 4, [0, 0, 58]);
+box("Deck_Core", "TorsoDeck", "new", 326, TORSO_W, 4, [0, 0, 58]);
 box("Deck_Spine", "TorsoDeck", "join", 600, 80, 4, [0, 0, 58]);
-box("Floor_Plate", "TorsoFloor", "new", 326, 208, 4, [0, 0, -52]);
-box("SideL_Plate", "TorsoSideL", "new", 320, 4, 106, [0, 102, 3]);
-box("SideR_Plate", "TorsoSideR", "new", 320, 4, 106, [0, -102, 3]);
+box("Floor_Plate", "TorsoFloor", "new", 326, TORSO_W, 4, [0, 0, -52]);
+box("SideL_Plate", "TorsoSideL", "new", 240, 2, 106, [0, TORSO_W / 2 - 1, 3]);   // between the abduction actuators
+box("SideR_Plate", "TorsoSideR", "new", 240, 2, 106, [0, -(TORSO_W / 2 - 1), 3]);
 for (const sx of [1, -1]) {
   const n = sx > 0 ? "BulkheadF" : "BulkheadR";
-  box(n + "_Plate", n, "new", 3, 200, 106, [sx * 161.5, 0, 3]);
+  box(n + "_Plate", n, "new", 3, TORSO_W, 106, [sx * 161.5, 0, 3]);
   for (const sy of [1, -1])
     cyl(n + "_Pilot" + (sy > 0 ? "L" : "R"), n, "cut", 43.2, 5, [sx * 159, sy * ABD_Y, 0], [sx, 0, 0]);
 }
@@ -77,24 +78,24 @@ for (const { id, sx, sy } of legs) {
   motor("MotorA_" + id, { at: -50, dir: 1 }, "x");
   // carrier: ring around hip-pitch motor + back plate on the abduction flange
   const C = "Carrier_" + id;
-  cyl(C + "_Ring", C, "new", 88, 24, [hx, Y(-14), 0], ay);
-  box(C + "_BackPlate", C, "join", 6, 24, 70, [X(-43), Y(-2), 0]);
-  cyl(C + "_Bore", C, "cut", 79, 26, [hx, Y(-15), 0], ay);
-  motor("MotorH_" + id, { at: 14, dir: 1 }, "y");
+  cyl(C + "_Ring", C, "new", 88, 28, [hx, Y(2), 0], ay);
+  box(C + "_Block", C, "join", 18, 57, 68, [X(-37), Y(11.5), 0]);
+  cyl(C + "_Bore", C, "cut", 79.2, 31, [hx, Y(10), 0], ay);
+  motor("MotorH_" + id, { at: 38, dir: 1 }, "y");
   // thigh plates
-  for (const [nm, y0] of [["ThighInner_", 18], ["ThighOuter_", 42]]) {
+  for (const [nm, y0] of [["ThighInner_", 42], ["ThighOuter_", 80]]) {
     const B = nm + id;
-    cyl(B + "_HipDisc", B, "new", 90, 4, [hx, Y(y0), 0], ay);
-    box(B + "_Web", B, "join", 50, 4, "L_thigh", [hx, Y(y0 + 2), "-L_thigh/2"]);
-    cyl(B + "_KneeDisc", B, "join", 56, 4, [hx, Y(y0), "-L_thigh"], ay);
+    cyl(B + "_HipDisc", B, "new", 84, 3, [hx, Y(y0), 0], ay);
+    box(B + "_Web", B, "join", 80, 3, "L_thigh", [hx, Y(y0 + 1.5), "-L_thigh/2"]);
+    cyl(B + "_KneeDisc", B, "join", 84, 3, [hx, Y(y0), "-L_thigh"], ay);
   }
-  cyl("ThighOuter_" + id + "_PilotHole", "ThighOuter_" + id, "cut", 43.4, 6, [hx, Y(41), 0], ay);
-  motor("MotorK_" + id, { at: 46, dir: -1 }, "y");
-  cyl("HipPulley_" + id + "_20T", "HipPulley_" + id, "new", 31.8, 18, [hx, Y(24), 0], ay);
+  cyl("ThighOuter_" + id + "_PilotHole", "ThighOuter_" + id, "cut", 43.4, 5, [hx, Y(79), 0], ay);
+  motor("MotorK_" + id, { at: 83, dir: -1 }, "y");
+  cyl("HipPulley_" + id + "_24T", "HipPulley_" + id, "new", 37, 19.5, [hx, Y(59.5), 0], ay);
   const S = "Shank_" + id;
-  cyl(S + "_KneePulley30T", S, "new", 47.7, 16, [hx, Y(24), "-L_thigh"], ay);
-  box(S + "_Bar", S, "join", 28, 16, "L_shank", [hx, Y(32), "-L_thigh - L_shank/2"]);
-  cyl(S + "_Foot", S, "join", 44, 24, [hx, Y(20), "-L_thigh - L_shank"], ay);
+  cyl(S + "_KneePulley36T", S, "new", 56, 34, [hx, Y(45.5), "-L_thigh"], ay);
+  box(S + "_Blade", S, "join", 30, 13, "L_shank", [hx, Y(52), "-L_thigh - L_shank/2"]);
+  cyl(S + "_Foot", S, "join", 56, 24, [hx, Y(40), "-L_thigh - L_shank"], ay);
 }
 
 // ---- components and joints ----
@@ -126,8 +127,8 @@ const pose = [];
 for (const { id, sx, sy } of legs) {
   const hx = sx * HIP_X;
   joint("HipAbduction_" + id, "Torso", "HipCarrier_" + id, [hx - sx * 46, sy * ABD_Y, 0], [1, 0, 0], [-45, 45]);
-  joint("HipPitch_" + id, "HipCarrier_" + id, "Thigh_" + id, [hx, sy * (ABD_Y + 18), 0], [0, 1, 0], [-120, 120]);
-  joint("Knee_" + id, "Thigh_" + id, "LowerLeg_" + id, [hx, sy * (ABD_Y + 32), -L_THIGH], [0, 1, 0], [-150, 150]);
+  joint("HipPitch_" + id, "HipCarrier_" + id, "Thigh_" + id, [hx, sy * (ABD_Y + 42), 0], [0, 1, 0], [-120, 120]);
+  joint("Knee_" + id, "Thigh_" + id, "LowerLeg_" + id, [hx, sy * (ABD_Y + 52), -L_THIGH], [0, 1, 0], [-150, 150]);
   pose.push({ command: "joint.drive", params: { joint: "HipPitch_" + id, value: STAND_HIP } });
   pose.push({ command: "joint.drive", params: { joint: "Knee_" + id, value: STAND_KNEE } });
 }
