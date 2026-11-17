@@ -1,5 +1,5 @@
 // Generates the SolidCraft command script for the whole robot: detailed torso + four detailed legs,
-// with head, neck and tail still as placeholder blocks.
+// plus neck, head and tail built around serial bus servos.
 // Usage: node cad/scripts/gen_robot.js   then
 //   solidcraft-cli run cad/robot/build/robot.json --save cad/robot/robot.sc
 // Frame: X forward, Y left, Z up. Origin at the torso centre, on the height of the hip abduction axes.
@@ -83,22 +83,75 @@ boxc("BellyPan_InnerUpper", "BellyPan", "cut", PAN_L + 2, 2 * (TORSO_HALF_W - T_
 // ---- deck: full-width between the bulkheads, narrow spine out to the neck and tail ----
 const zDeck = TORSO_TOP + T_DECK / 2;
 boxc("Deck_Core", "Deck", "new", 2 * (X_BULK + T_FRAME), 2 * TORSO_HALF_W, T_DECK, [0, 0, zDeck]);
-boxc("Deck_Spine", "Deck", "join", 600, 60, T_DECK, [0, 0, zDeck]);
+boxc("Deck_Spine", "Deck", "join", 612, 60, T_DECK, [0, 0, zDeck]);
 boxc("Battery_Keepout", "BatteryBay", "new", 200, 110, 72, [0, 0, 2]);
 
-// ---- neck, head and tail placeholders ----
-const zTop = TORSO_TOP + T_DECK;
-const NECK_LEN = 92.5, NECK_BASE = [265, 0, zTop];
-const NT = [NECK_BASE[0] + NECK_LEN * Math.SQRT1_2, 0, NECK_BASE[2] + NECK_LEN * Math.SQRT1_2];
-const r1 = (v) => Math.round(v * 10) / 10;
-boxc("NeckTilt_Block", "NeckTilt", "new", 45, 25, 36, [NECK_BASE[0], 0, TORSO_TOP - 18]);
-cylc("Neck_Tube", "Neck", "new", 50, NECK_LEN, NECK_BASE, [1, 0, 1]);
-boxc("HeadPan_Block", "HeadPan", "new", 45, 25, 36, [r1(NT[0] + 3), 0, r1(NT[2] + 18)]);
-boxc("Head_Skull", "Head", "new", 110, 100, 90, [r1(NT[0] + 33), 0, r1(NT[2] + 46)]);
-boxc("Head_Muzzle", "Head", "join", 100, 60, 50, [r1(NT[0] + 138), 0, r1(NT[2] + 26)]);
-const zTail = TORSO_TOP - 18;
-boxc("TailPan_Block", "TailPan", "new", 30, 25, 36, [-315, 0, zTail]);
-cylc("Tail_Rod", "Tail", "new", 24, 320, [-330, 0, zTail], [-1, 0, 0.5]);
+// ---- neck, head and tail ----
+// Serial bus servos, Feetech STS family: body 45 x 24.7 x 35 mm (35 along the shaft), shaft 10 mm from one end.
+// Dimensions are from memory of the datasheet: verify before detailing the mounts.
+const SV = { L: 45, W: 24.7, H: 35, off: 10, horn: 3 };
+const zTop = TORSO_TOP + T_DECK;                 // top of the deck
+const boxE = (name, body, op, x0, x1, y0, y1, z0, z1) =>
+  boxc(name, body, op, r3(x1 - x0), r3(y1 - y0), r3(z1 - z0), [r3((x0 + x1) / 2), r3((y0 + y1) / 2), r3((z0 + z1) / 2)]);
+const SQ = Math.SQRT1_2;
+
+// Neck tilt: servo lying on the deck, shaft along Y, ahead of the sweep of the hip carriers (x > 256 is clear).
+const NK = { x: 275, z: zTop + 3 + SV.W / 2 };   // tilt axis
+boxE("NeckBase_Plate", "NeckBase", "new", NK.x - 37, NK.x + 13, -20.5, 20.5, zTop, zTop + 3);
+boxE("NeckTiltServo_Body", "NeckTiltServo", "new", NK.x - (SV.L - SV.off), NK.x + SV.off, -SV.H / 2, SV.H / 2, zTop + 3, zTop + 3 + SV.W);
+// Neck (printed): yoke on both servo horns, bridge, tube at 45 degrees, cradle for the pan servo.
+const yokeY = SV.H / 2 + SV.horn;                // 20.5: inner face of the yoke cheeks
+const BR = 22;                                   // bridge distance from the tilt axis
+const NB = [NK.x + BR * SQ, 0, NK.z + BR * SQ];  // bridge centre
+for (const sy of [1, -1]) {
+  const s = sy > 0 ? "L" : "R";
+  cylc("Neck_Cheek" + s, "Neck", s === "L" ? "new" : "join", 24, 3, [NK.x, sy > 0 ? yokeY : -yokeY - 3, NK.z], "Y");
+  cylc("Neck_Arm" + s, "Neck", "join", 10, BR, [NK.x, sy * (yokeY + 1.5), NK.z], [1, 0, 1]);
+}
+cylc("Neck_Bridge", "Neck", "join", 10, 2 * (yokeY + 3), [r3(NB[0]), -yokeY - 3, r3(NB[2])], "Y");
+const TUBE = 45;
+cylc("Neck_Tube", "Neck", "join", 28, TUBE, [r3(NB[0]), 0, r3(NB[2])], [1, 0, 1]);
+const NTOP = [NB[0] + TUBE * SQ, NB[2] + TUBE * SQ];          // tube end [x, z]
+const PAN = { x: Math.round(NTOP[0] + 11), z0: Math.round(NTOP[1]) };   // pan axis x, pan servo body bottom
+PAN.z1 = PAN.z0 + SV.H;                                        // pan servo top (horn face)
+boxE("Neck_Cradle", "Neck", "join", PAN.x - 38, PAN.x + 13, -SV.W / 2 - 3, SV.W / 2 + 3, PAN.z0 - 4, PAN.z1 - 6);
+boxE("Neck_CradlePocket", "Neck", "cut", PAN.x - 35.2, PAN.x + 10.2, -SV.W / 2 - 0.2, SV.W / 2 + 0.2, PAN.z0, PAN.z1);
+boxE("HeadPanServo_Body", "HeadPanServo", "new", PAN.x - (SV.L - SV.off), PAN.x + SV.off, -SV.W / 2, SV.W / 2, PAN.z0, PAN.z1);
+// Head (printed shell, 2.5 mm walls): skull + muzzle, a camera behind each eye, spare room inside.
+const HD = { z0: PAN.z1 + SV.horn, wall: 2.5, skullL: 110, skullW: 100, skullH: 85, muzL: 95, muzW: 56, muzH: 48,
+  eyeY: 32, eyeUp: 67, cam: [12, 25, 24] };      // camera keep-out: Raspberry Pi Camera Module 3 size
+const hx0 = PAN.x - 33, hx1 = hx0 + HD.skullL, mx1 = hx1 + HD.muzL, w = HD.wall;
+cylc("PanHorn_Disc", "PanHorn", "new", 22, SV.horn, [PAN.x, 0, PAN.z1], "Z");
+boxE("Head_Skull", "Head", "new", hx0, hx1, -HD.skullW / 2, HD.skullW / 2, HD.z0, HD.z0 + HD.skullH);
+boxE("Head_Muzzle", "Head", "join", hx1, mx1, -HD.muzW / 2, HD.muzW / 2, HD.z0 + 3, HD.z0 + 3 + HD.muzH);
+boxE("Head_SkullCavity", "Head", "cut", hx0 + w, hx1 - w, -HD.skullW / 2 + w, HD.skullW / 2 - w, HD.z0 + w, HD.z0 + HD.skullH - w);
+boxE("Head_MuzzleCavity", "Head", "cut", hx1 - 2 * w, mx1 - w, -HD.muzW / 2 + w, HD.muzW / 2 - w, HD.z0 + 3 + w, HD.z0 + 3 + HD.muzH - w);
+cylc("Head_HornHole", "Head", "cut", 8, w + 2, [PAN.x, 0, HD.z0 - 1], "Z");
+for (const sy of [1, -1]) {
+  const s = sy > 0 ? "L" : "R", ez = HD.z0 + HD.eyeUp, [cl, cw, ch] = HD.cam;
+  cylc("Head_Eye" + s, "Head", "cut", 10, w + 2, [hx1 - w - 1, sy * HD.eyeY, ez], "X");
+  boxE("Camera" + s + "_Keepout", "Camera" + s, "new", hx1 - w - cl - 0.5, hx1 - w - 0.5,
+    sy * HD.eyeY - cw / 2, sy * HD.eyeY + cw / 2, ez - ch / 2, ez + ch / 2);
+}
+
+// Tail: wag servo hangs under the rear of the deck spine (x < -256 is clear of the hip carriers), shaft up
+// through the deck; it carries the lift servo; the tail itself is a flexible TPU rod on a yoke.
+const TW = { x: -293 };                          // wag axis
+boxE("TailWagServo_Body", "TailWagServo", "new", TW.x - SV.off, TW.x + (SV.L - SV.off), -SV.W / 2, SV.W / 2, TORSO_TOP - SV.H, TORSO_TOP);
+cylc("Deck_WagShaftHole", "Deck", "cut", 12, T_DECK + 2, [TW.x, 0, TORSO_TOP - 1], "Z");
+cylc("TailBracket_Horn", "TailBracket", "new", 22, SV.horn, [TW.x, 0, zTop], "Z");
+const TL = { x: TW.x - 35, z: zTop + SV.horn + 3 + SV.W / 2 };   // lift axis
+boxE("TailBracket_Plate", "TailBracket", "join", TL.x - SV.off, TW.x + 5, -SV.H / 2, SV.H / 2, zTop + SV.horn, zTop + SV.horn + 3);
+boxE("TailLiftServo_Body", "TailLiftServo", "new", TL.x - SV.off, TL.x + (SV.L - SV.off), -SV.H / 2, SV.H / 2, zTop + SV.horn + 3, zTop + SV.horn + 3 + SV.W);
+const TDIR = [-1, 0, 0.5], TN = Math.hypot(1, 0.5);              // tail direction: back and up
+const TB = [TL.x - BR / TN, 0, TL.z + (0.5 * BR) / TN];          // yoke bridge centre
+for (const sy of [1, -1]) {
+  const s = sy > 0 ? "L" : "R";
+  cylc("TailYoke_Cheek" + s, "TailYoke", s === "L" ? "new" : "join", 24, 3, [TL.x, sy > 0 ? yokeY : -yokeY - 3, r3(TL.z)], "Y");
+  cylc("TailYoke_Arm" + s, "TailYoke", "join", 10, BR, [TL.x, sy * (yokeY + 1.5), r3(TL.z)], TDIR);
+}
+cylc("TailYoke_Bridge", "TailYoke", "join", 10, 2 * (yokeY + 3), [r3(TB[0]), -yokeY - 3, r3(TB[2])], "Y");
+cylc("Tail_Rod", "Tail", "new", 22, 300, [r3(TB[0]), 0, r3(TB[2])], TDIR);
 
 // ---- legs ----
 const legs = [
@@ -114,16 +167,16 @@ const comp = (name, bodies) => {
 const joint = (name, a, b, point, z, limits) =>
   cmds.push({ command: "joint.as_built", params: { type: "revolute", a, b,
     at: { occurrence: a + ":1", point, z }, name, limits: [limits] } });
-comp("Torso", ["BulkheadF", "BulkheadR", "MidFrameF", "MidFrameR", "BellyPan", "Deck", "BatteryBay", "NeckTilt",
-  ...legs.flatMap((l) => l.bodies.torso)]);
-comp("NeckAsm", ["Neck", "HeadPan"]);
-comp("HeadAsm", ["Head"]);
-comp("TailPanLink", ["TailPan"]);
-comp("TailAsm", ["Tail"]);
-joint("NeckPitch", "Torso", "NeckAsm", NECK_BASE, [0, 1, 0], [-40, 40]);
-joint("HeadYaw", "NeckAsm", "HeadAsm", [r1(NT[0] + 3), 0, r1(NT[2] + 36)], [0, 0, 1], [-70, 70]);
-joint("TailYaw", "Torso", "TailPanLink", [-300, 0, zTail], [0, 0, 1], [-60, 60]);
-joint("TailPitch", "TailPanLink", "TailAsm", [-330, 0, zTail], [0, 1, 0], [-60, 60]);
+comp("Torso", ["BulkheadF", "BulkheadR", "MidFrameF", "MidFrameR", "BellyPan", "Deck", "BatteryBay",
+  "NeckBase", "NeckTiltServo", "TailWagServo", ...legs.flatMap((l) => l.bodies.torso)]);
+comp("NeckAsm", ["Neck", "HeadPanServo"]);
+comp("HeadAsm", ["Head", "PanHorn", "CameraL", "CameraR"]);
+comp("TailPanLink", ["TailBracket", "TailLiftServo"]);
+comp("TailAsm", ["TailYoke", "Tail"]);
+joint("NeckPitch", "Torso", "NeckAsm", [NK.x, 0, r3(NK.z)], [0, 1, 0], [-40, 40]);
+joint("HeadYaw", "NeckAsm", "HeadAsm", [PAN.x, 0, PAN.z1], [0, 0, 1], [-70, 70]);
+joint("TailYaw", "Torso", "TailPanLink", [TW.x, 0, zTop], [0, 0, 1], [-60, 60]);
+joint("TailPitch", "TailPanLink", "TailAsm", [TL.x, 0, r3(TL.z)], [0, 1, 0], [-60, 60]);
 const pose = [];
 for (const l of legs) {
   comp("HipCarrier_" + l.id, l.bodies.carrier);

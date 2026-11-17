@@ -22,8 +22,12 @@
 - **Bay access:** decide how the battery goes in and out.
 
 ## Head, neck, tail
-- Choose the exact servos, model them, design the linkages and mounts.
-- The neck tilt servo placeholder sits between the front hip carriers and may be hit at large abduction angles; check with the real servo shape.
+- **Verify servo dimensions** against the Feetech datasheet (modelled from memory as 45 × 24.7 × 35 mm, shaft 10 mm from one end, 3 mm horn) and pick the exact models. Then add mounting ears, screw holes and horn patterns; none are modelled.
+- **Head:** two plain hollow boxes. Needs a split line so it can be printed and opened, camera mounts, and shaping. The shell is about 230 g at 2.5 mm walls; thin it.
+- **Cameras:** keep-outs assume Raspberry Pi Camera Module 3; confirm once the computer is chosen. The muzzle partly blocks the lower inner field of view.
+- **Tail:** modelled as a rigid Ø22 × 300 mm rod (137 g solid). Make it hollow or tapered, and design how the TPU attaches to the yoke.
+- **Power:** the servos need about 12 V; add a step-down converter from the 36 V bus.
+- Head pan was swept clear to 62° before the check ran out of time; rerun to 70°.
 
 ## Checks still to run
 - Clearance sweeps on the other three legs (only front-left was swept fully; rear-left partly).

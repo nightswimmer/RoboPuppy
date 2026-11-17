@@ -5,7 +5,7 @@ A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts 
 ![Side view](cad/robot/robot_side.png)
 
 ## Status
-First detailed design pass. The whole robot is modelled as an articulated assembly with a detailed torso and four detailed legs. The head, neck and tail are still placeholders, and nothing has been built yet.
+First detailed design pass. The whole robot is modelled as an articulated assembly: torso, four legs, neck, head and tail. Fasteners, servo mounts and some drive details are still missing, and nothing has been built yet.
 
 ## Design targets
 - Torso about 60 cm long, with the rest scaled to a dog of that size
@@ -18,17 +18,21 @@ First detailed design pass. The whole robot is modelled as an articulated assemb
 | Joints | Actuator |
 |---|---|
 | 12 leg joints | RobStride 01 quasi-direct-drive (17 N·m peak, 380 g, CAN, 36 V) |
-| Head and tail | serial bus servos (to be finalised) |
+| Neck tilt, head pan, tail wag, tail lift | Feetech STS-family serial bus servos |
 
 ## Design
 ![Hip detail](cad/robot/robot_hip_detail.png)
 
 - **Legs:** an abduction actuator on the torso, a hip-pitch actuator in a printed carrier, and a knee actuator at the hip that drives the knee through a 1.5:1 HTD 5M belt between two laser-cut thigh plates. The shank, knee pulley and foot core are one printed part.
 - **Torso:** each pair of abduction actuators is clamped between two aluminium plates. A printed belly pan forms the central bay and an aluminium deck closes the top.
+- **Neck and head:** a tilt servo on the deck nods the whole neck; a pan servo at the top of the neck turns a hollow printed head with a camera behind each eye.
+- **Tail:** a wag servo and a lift servo at the tail root move a flexible TPU tail.
+
+![Head detail](cad/robot/robot_head_detail.png)
 
 | Measure | Value |
 |---|---|
-| Torso structure length | 600 mm |
+| Torso structure length | 612 mm |
 | Hip spacing, front to rear | 420 mm |
 | Width | 323 mm |
 | Thigh / shank | 242 mm / 242 mm |

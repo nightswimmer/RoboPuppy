@@ -16,7 +16,10 @@ A Labrador-sized robotic dog built from 3D-printed and laser-cut parts, designed
 
 ## Decisions so far
 - **Leg actuators:** 12× RobStride 01 (17 N·m peak, 6 N·m rated, 380 g, Ø78.5 × 40.5 mm, CAN bus, 36 V rated, 24–50 V range). Accepted budget is roughly EUR 1,600–1,900 for all actuators.
-- **Head and tail actuators:** serial bus servos (about 50 kg·cm class for neck tilt, Feetech STS3215 class for the other three). Not yet selected in detail; modelled as blocks.
+- **Head and tail actuators:** four Feetech STS-family serial bus servos (STS3215 class for head pan and both tail axes, a stronger one of the same size for neck tilt). Modelled as 45 × 24.7 × 35 mm bodies from memory of the datasheet; dimensions not yet verified. They need about 12 V, so a step-down converter from the 36 V battery.
+- **Neck:** tilt servo lies on top of the deck at the front (ahead of the hip carriers' sweep); a printed neck (yoke, 45 mm tube at 45°, cradle) carries the pan servo.
+- **Head:** hollow printed shell (skull 110 × 100 × 85, muzzle 95 × 56 × 48, 2.5 mm walls) on the pan servo horn. One camera behind each eye, 64 mm apart; keep-out sized for a Raspberry Pi Camera Module 3 (assumption until the computer is chosen). The rest of the head is left empty for future additions.
+- **Tail:** wag servo hangs under the rear tip of the deck spine with its shaft up through the deck; it carries the lift servo; the tail is a flexible 300 mm TPU rod on a yoke.
 - **Leg architecture:** abduction actuator fixed to the torso; hip-pitch actuator held in a printed carrier; knee actuator on the thigh, coaxial with the hip pitch, driving the knee through a 1.5:1 belt (HTD 5M, 15 mm wide, 635 mm long, 24:36 teeth) between two thigh plates. The shank blade swings beside the belt, not in its plane.
 - **Thigh plates:** 3 mm aluminium, laser-cut (owner's choice for now; carbon would save about 0.55 kg in total).
 - **Link lengths:** thigh 242.2 mm (set by the belt), shank 242 mm. Back height about 470 mm standing.
@@ -25,7 +28,7 @@ A Labrador-sized robotic dog built from 3D-printed and laser-cut parts, designed
 - **Torso:** each pair of abduction actuators is clamped between a bulkhead and a mid frame (3 mm aluminium). A printed belly pan spans between the mid frames; a 2 mm aluminium deck closes the top and extends as a spine to the neck and tail. Lower corners are rounded about the abduction axes and the top is only 120 mm wide, so the thighs can swing past.
 - **Knee direction:** all four knees bend backward.
 - **Battery:** 10S Li-ion (36 V). About 180 Wh (10S1P, ~0.8 kg) gives roughly 1 h; about 360 Wh (10S2P, ~1.5 kg) gives roughly 2 h. Estimated draw is 40–60 W standing, 120–200 W trotting, 0.5–1 kW peaks.
-- **Mass:** target about 11 kg; current estimate 10.5–11.2 kg.
+- **Mass:** target about 11 kg; current estimate 10.5–11.2 kg (the head shell is about 230 g and the tail 137 g if solid; both should be lightened).
 
 ## Tooling
 - SolidCraft is driven by Claude through its MCP connector (`solidcraft` server). The connector must be started with `--allow-path` pointing at this repo (set in the user-level `.claude.json`), otherwise it cannot save here.
@@ -46,7 +49,7 @@ A Labrador-sized robotic dog built from 3D-printed and laser-cut parts, designed
 - Superseded, kept for now: `cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.*`, `cad/scripts/gen_blockout.js`.
 
 ## Current state
-First detailed pass. The whole robot exists as one articulated model (16 joints): a detailed torso and four detailed legs with real bolt patterns, checked for clearances on the front-left leg. Head, neck and tail are placeholder blocks. Nothing has been printed or cut; see HANDOFF.md for what is missing before a first test build.
+First detailed pass. The whole robot exists as one articulated model (16 joints): a detailed torso, four detailed legs with real bolt patterns, and a neck, head and tail built around servo positions. Clearances are checked on the front-left leg and on the neck, head and tail joints. Nothing has been printed or cut; see HANDOFF.md for what is missing before a first test build.
 
 ## Coordinate convention
 X forward, Y left, Z up. Origin at the torso centre, at the height of the hip abduction axes. Leg-local frame: origin where the abduction axis meets the hip pitch axis, Y outward.
