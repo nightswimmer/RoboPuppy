@@ -1,0 +1,6 @@
+# Generated SolidCraft command scripts (rebuild with: node cad/scripts/gen_blockout.js)
+cad/robot/build/
+
+# SolidCraft lock and backup files
+.~*.lock
+*.sc.bak
