@@ -34,6 +34,9 @@ module.exports = {
   win_x: 4, win_z0: 65, win_len: 105, win_w: 28,   // lightening window
   idl_z: 110, idl_x0: 34, idl_len: 11, idl_w: 5.2, idl_x: 31,   // tensioner slot; idl_x = nominal roller position
   axle_d: 8, pilot_clear_d: 43.2,
+  // hip spacer: closes the gap between the plates around the hip end, clamped by the knee actuator screws
+  sp_bore_d: 56,         // clears the belt on the hip pulley (back at r ~20) and the heads of the three lower actuator screws
+  sp_end: 6,             // legs run this far past the upper standoff holes
   // hip carrier
   cup_od: 88, cup_rear: 8, cup_len: 28, bore_d: 79.2, opening_d: 65,
   cover_relief: 1,       // the rear opening starts this far behind the cup, so the actuator cover (0.5 proud) clears the block
@@ -58,6 +61,13 @@ module.exports = {
   mid_slot: 18, mid_slot_z0: 28, mid_head_d: 6.5,
   deck_spine_l: 612, deck_spine_w: 60, wag_hole_d: 12,
   bat_l: 200, bat_w: 110, bat_h: 72, bat_z0: -34,
+  // spine ribs: bent 3 mm aluminium L under each end of the deck spine, from the mid frame through a slot in the bulkhead
+  rib_t: 3, rib_h: 30,   // web thickness and depth below the deck (bottom stays clear of the abduction actuators)
+  rib_fl: 15,            // flange width, from the web's far face; bent toward +Y on the front rib
+  rib_clr: 0.2,          // clearance around the rib in the bulkhead slot
+  rib_hx0: 13, rib_pitch: 29,   // flange screws, from the rib root (the fourth stays clear of the neck base)
+  rib_tip_hole: 7,       // extra flange screw near the front rib's tip
+  rib_gap: 1,            // rear rib tip to the tail wag servo
 
   // ---- neck, head, tail ----
   neck_x: 275,           // neck tilt axis

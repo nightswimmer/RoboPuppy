@@ -9,6 +9,13 @@ const defs = [];
 const def = (key, info, build) => defs.push({ key, info, build });
 const S = Math.SQRT1_2;
 
+// Spine ribs: root on the mid frame's outer face; the front rib runs to the tip of the deck spine, the rear
+// rib to just short of the tail wag servo. Flange screw positions are measured from the root.
+const RIB_ROOT_X = "(x_mid + t_frame)";
+const RIB_L_FRONT = "deck_spine_l/2 - x_mid - t_frame";
+const RIB_L_REAR = "tail_wag_x - (sv_l - sv_off) - rib_gap - x_mid - t_frame";
+const RIB_SCREWS_X = ["rib_hx0", "rib_hx0 + rib_pitch", "rib_hx0 + 2*rib_pitch", "rib_hx0 + 3*rib_pitch"];
+
 // ============================ purchased ============================
 
 // Frame: axis Z, origin on the housing front face, output toward +Z, plug toward +X.
@@ -128,6 +135,11 @@ def("hip_carrier", { body: "HipCarrier", part_number: "RP-101", sym: { axis: "z"
   p.extrude("FlangeCounterbores", "block_t - cb_floor", { op: "cut" });
 });
 
+// Knee actuator front-face M3 pattern about the hip axis, in the thigh plate frame. One source for both plates
+// and the hip spacer: the six upper screws run through inner plate, spacer and outer plate into the actuator;
+// the three lower ones hold only the outer plate, and the inner plate's holes there give a hex key access.
+const kneeM3 = (s) => s.pattern([s.pointOn(s.polar("origin", "rs_m3_bcd/2", 70).end)], "origin", 9);
+
 // Frame: plate in the XY plane, X forward, Y up, origin on the hip axis, knee at (0, -lt). Thickness along +Z.
 // Flat with through features only, so it can be turned over: the same plate serves both sides.
 const thighPlate = (p) => {
@@ -147,6 +159,8 @@ const thighPlate = (p) => {
     s.point("standoff_x", neg("so_z4"));
   });
   p.hole("StandoffHoles", "Standoff_Sketch", { clearance: "M3", fit: "close" });
+  p.sketch("KneeM3_Sketch", "XY", 0, kneeM3);
+  p.hole("KneeM3", "KneeM3_Sketch", { clearance: "M3" });
 };
 
 def("thigh_inner_plate", { body: "ThighInnerPlate", part_number: "RP-102", sym: { axis: "z", about: "t_plate/2" },
@@ -163,8 +177,35 @@ def("thigh_outer_plate", { body: "ThighOuterPlate", part_number: "RP-103", sym: 
   thighPlate(p);
   p.sketch("Pilot_Sketch", "XY", 0, (s) => s.circle(0, 0, "pilot_clear_d"));
   p.extrude("PilotHole", 0, { op: "cut", through: true });
-  p.sketch("MotorM3_Sketch", "XY", 0, (s) => s.pattern([s.pointOn(s.polar("origin", "rs_m3_bcd/2", 70).end)], "origin", 9));
-  p.hole("MotorM3", "MotorM3_Sketch", { clearance: "M3" });
+});
+
+// Frame: the thigh plate frame (X forward, Y up, origin on the hip axis), filling the cavity from z = 0 to cav.
+// A horseshoe over the hip pulley with legs down both plate edges to the upper standoff holes, so the two
+// plates are tied together at the hip end as the knee axle ties them at the knee. The upper standoffs are
+// replaced by M3 through-bolts in the legs. A prism with through holes: turned over, it serves both sides.
+def("hip_spacer", { body: "HipSpacer", part_number: "RP-108", sym: { axis: "z", about: "cav/2" },
+  description: "Hip spacer between the thigh plates, printed" }, (p) => {
+  p.sketch("Arch_Sketch", "XY", 0, (s) => s.circle(0, 0, "plate_w"));
+  p.extrude("Arch", "cav", { op: "new" });
+  p.sketch("Legs_Sketch", "XY", 0, (s) => {
+    const r = s.rect(neg("plate_w/2"), neg("so_z1 + sp_end"), "plate_w/2", 0, "plate_w", "so_z1 + sp_end");
+    s.dist(r.right, "plate_w/2");
+    s.on(r.top);
+  });
+  p.extrude("Legs", "cav");
+  // holes first, while there is material at every point of the actuator pattern; the bore and slot then take the lower three away
+  p.sketch("KneeM3_Sketch", "XY", 0, kneeM3);
+  p.hole("KneeM3", "KneeM3_Sketch", { clearance: "M3", depth: "cav" });
+  p.sketch("Bolts_Sketch", "XY", 0, (s) => s.mirror([s.point("standoff_x", neg("so_z1"))], "y"));
+  p.hole("Bolts", "Bolts_Sketch", { clearance: "M3", depth: "cav" });
+  p.sketch("Bore_Sketch", "XY", 0, (s) => s.circle(0, 0, "sp_bore_d"));
+  p.extrude("Bore", 0, { op: "cut", through: true });
+  p.sketch("Slot_Sketch", "XY", 0, (s) => {
+    const r = s.rect(neg("sp_bore_d/2"), neg("so_z1 + sp_end"), "sp_bore_d/2", 0, "sp_bore_d", "so_z1 + sp_end");
+    s.dist(r.right, "sp_bore_d/2");
+    s.on(r.top);
+  });
+  p.extrude("Slot", 0, { op: "cut", through: true });
 });
 
 // Frame: axis Z, from z = 0 to pulley_w. Tooth profile still to be modelled.
@@ -244,6 +285,22 @@ def("bulkhead", { body: "Bulkhead", part_number: "RP-201", sym: { axis: "z", abo
   });
   p.hole("M3Left", "M3_Sketch", { clearance: "M3" });
   p.mirrorFeature("RightSide", ["PilotLeft", "M3Left"], "YZ");
+  // spine rib passing through: a slot for the web and a notch at the top for the flange, which is bent to one
+  // side on the front rib and to the other on the rear rib
+  p.sketch("RibSlot_Sketch", "XY", 0, (s) => {
+    const r = s.rect(neg("rib_t/2 + rib_clr"), "torso_top - rib_h - rib_clr", "rib_t/2 + rib_clr", "torso_top + rib_clr",
+      "rib_t + 2*rib_clr", "rib_h + 2*rib_clr");
+    s.dist(r.right, "rib_t/2 + rib_clr");
+    s.dist(r.bottom, "torso_top - rib_h - rib_clr");
+  });
+  p.extrude("RibSlot", 0, { op: "cut", through: true });
+  p.sketch("FlangeNotch_Sketch", "XY", 0, (s) => {
+    const r = s.rect(neg("rib_fl - rib_t/2 + rib_clr"), "torso_top - rib_t - rib_clr", "rib_fl - rib_t/2 + rib_clr", "torso_top + rib_clr",
+      "2*(rib_fl - rib_t/2 + rib_clr)", "rib_t + 2*rib_clr");
+    s.dist(r.right, "rib_fl - rib_t/2 + rib_clr");
+    s.dist(r.bottom, "torso_top - rib_t - rib_clr");
+  });
+  p.extrude("FlangeNotch", 0, { op: "cut", through: true });
 });
 
 def("mid_frame", { body: "MidFrame", part_number: "RP-202", sym: { axis: "z", about: "t_frame/2" },
@@ -291,7 +348,44 @@ def("deck", { body: "Deck", part_number: "RP-204", description: "Deck with spine
   p.extrude("Plate", "t_deck", { op: "new" });
   p.sketch("WagShaft_Sketch", "XY", "t_deck", (s) => s.point(neg("tail_wag_x"), 0));
   p.hole("WagShaftHole", "WagShaft_Sketch", { diameter: "wag_hole_d" });
+  // spine rib flange screws: the front rib's flange is on the left, the rear rib's (turned half a turn) on the right
+  p.sketch("FrontRibScrews_Sketch", "XY", "t_deck", (s) => {
+    RIB_SCREWS_X.forEach((x) => s.point(`${RIB_ROOT_X} + ${x}`, "rib_fl/2"));
+    s.point(`${RIB_ROOT_X} + (${RIB_L_FRONT}) - rib_tip_hole`, "rib_fl/2");
+  });
+  p.hole("FrontRibScrews", "FrontRibScrews_Sketch", { clearance: "M3", depth: "t_deck" });
+  p.sketch("RearRibScrews_Sketch", "XY", "t_deck", (s) =>
+    RIB_SCREWS_X.forEach((x) => s.point(neg(`${RIB_ROOT_X} + ${x}`), neg("rib_fl/2"))));
+  p.hole("RearRibScrews", "RearRibScrews_Sketch", { clearance: "M3", depth: "t_deck" });
 });
+
+// Spine ribs. Frame (front rib): robot axes, origin on the centreline at the rib root (the mid frame's face)
+// on the deck underside. The web hangs below the deck and runs forward through the bulkhead slot; the flange
+// is bent toward +Y and screwed to the deck. The rear rib is placed turned half a turn about Z.
+// Bend radius not modelled (sharp corner).
+const spineRib = (len, tipHole) => (p) => {
+  p.sketch("Web_Sketch", "YZ", 0, (s) => {
+    const r = s.rect(neg("rib_t/2"), neg("rib_h"), "rib_t/2", 0, "rib_t", "rib_h");
+    s.dist(r.right, "rib_t/2");
+    s.on(r.top);
+  });
+  p.extrude("Web", len, { op: "new" });
+  p.sketch("Flange_Sketch", "YZ", 0, (s) => {
+    const r = s.rect(neg("rib_t/2"), neg("rib_t"), "rib_fl - rib_t/2", 0, "rib_fl", "rib_t");
+    s.dist(r.left, "rib_t/2");
+    s.on(r.top);
+  });
+  p.extrude("Flange", len);
+  p.sketch("DeckScrews_Sketch", "XY", 0, (s) => {
+    RIB_SCREWS_X.forEach((x) => s.point(x, "rib_fl/2"));
+    if (tipHole) s.point(`(${len}) - rib_tip_hole`, "rib_fl/2");
+  });
+  p.hole("DeckScrews", "DeckScrews_Sketch", { clearance: "M3", depth: "rib_t" });
+};
+def("spine_rib_front", { body: "SpineRibFront", part_number: "RP-205",
+  description: "Front spine rib, 3 mm aluminium, laser-cut and bent" }, spineRib(RIB_L_FRONT, true));
+def("spine_rib_rear", { body: "SpineRibRear", part_number: "RP-206",
+  description: "Rear spine rib, 3 mm aluminium, laser-cut and bent" }, spineRib(RIB_L_REAR, false));
 
 def("battery_keepout", { body: "BatteryKeepout", part_number: "REF-BATTERY", bom_type: "reference",
   description: "Battery keep-out volume" }, (p) => {

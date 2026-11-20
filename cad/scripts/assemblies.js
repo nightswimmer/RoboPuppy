@@ -74,12 +74,14 @@ const MOTOR_ABD = basis([0, 0, 1], [0, -1, 0], [1, 0, 0], [-(P.flange_x + P.rs_f
 const MOTOR_HIP = basis([0, 0, 1], [1, 0, 0], [0, 1, 0], [0, P.y_in - P.rs_flange_h, 0]);          // output outward
 const MOTOR_KNEE = basis([0, 0, 1], [-1, 0, 0], [0, -1, 0], [0, Y_K, 0]);                          // output inward
 const PLATE = (y) => basis([1, 0, 0], [0, 0, 1], [0, -1, 0], [0, y, 0]);                           // plate's +Z face at y
-const STANDOFFS = [[-P.standoff_x, -P.so_z1], [-P.standoff_x, -P.so_z2], [-P.standoff_x, -P.so_z3], [P.standoff_x, -P.so_z1], [P.standoff_x, -P.so_z4]];
+// the two upper standoff positions (so_z1) are taken by the hip spacer's through-bolts
+const STANDOFFS = [[-P.standoff_x, -P.so_z2], [-P.standoff_x, -P.so_z3], [P.standoff_x, -P.so_z4]];
 
 const HIP = [[parts.hip_carrier, I()], [parts.robstride01, MOTOR_HIP]];
 const THIGH = [
   [parts.thigh_inner_plate, PLATE(Y_CAV0)],
   [parts.thigh_outer_plate, PLATE(Y_K)],
+  [parts.hip_spacer, PLATE(Y_OUT)],
   [parts.robstride01, MOTOR_KNEE],
   [parts.hip_pulley, AX_Y([0, Y_BELT0, 0])],
   ...STANDOFFS.map(([x, z]) => [parts.standoff_m3x35, AX_Y([x, Y_CAV0, z])]),
@@ -136,6 +138,10 @@ function robot() {
   asm.place(parts.mid_frame, "Torso", FRAME(-P.x_mid - P.t_frame));
   asm.place(parts.belly_pan, "Torso", I());
   asm.place(parts.deck, "Torso", tr(0, 0, P.torso_top));
+  // spine ribs under the deck, from each mid frame through the bulkhead; the rear one turned half a turn
+  const ribRoot = P.x_mid + P.t_frame;
+  asm.place(parts.spine_rib_front, "Torso", tr(ribRoot, 0, P.torso_top));
+  asm.place(parts.spine_rib_rear, "Torso", mul(tr(-ribRoot, 0, P.torso_top), rz(180)));
   asm.place(parts.battery_keepout, "Torso", I());
   asm.place(parts.neck_base, "Torso", tr(P.neck_x, 0, zDeck));
   // neck tilt servo lying on the base, shaft along Y; tail wag servo hanging under the deck, shaft up

@@ -4,6 +4,10 @@
 //   node cad/scripts/build.js robot            whole robot assembly                -> cad/robot/robot.sc
 //   node cad/scripts/build.js all              parts, then both assemblies
 //   node cad/scripts/build.js symmetry         check that every part used on both sides equals its own mirror image
+//   node cad/scripts/build.js ping [words...]  check the connection to the open app (lists commands matching the words)
+// Add --app to run through the open SolidCraft desktop app (its control channel) instead of
+// solidcraft-cli, for example when Windows will not start the CLI. Each script then runs in a new
+// design tab, which is closed afterwards; the app's other tabs are left alone.
 // Run from the repository root. Each build fails if a sketch is not fully constrained.
 const fs = require("fs");
 const path = require("path");
@@ -11,12 +15,19 @@ const { execFileSync } = require("child_process");
 
 const CLI = process.env.SOLIDCRAFT_CLI || "C:\\Program Files\\SolidCraft\\solidcraft-cli.exe";
 const ROOT = path.join(__dirname, "..", "..");
+const args = process.argv.slice(2);
+const APP = args.includes("--app");
+const [what = "all", ...names] = args.filter((a) => a !== "--app");
+let app = null;                     // control channel connection, opened on first use
 
-function run(group, name, script, out, input) {
+// Runs a command script, saved to `out` (or applied to the design file `input` without saving).
+// Returns one result per command, or null on failure.
+async function run(group, name, script, out, input) {
   const dir = path.join(ROOT, "cad", group, "build");
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, name + ".json"), res = path.join(dir, name + ".results.json");
   fs.writeFileSync(file, JSON.stringify(script, null, 1));
+  if (APP) return runInApp(name, script, out, input, res);
   try {
     execFileSync(CLI, ["run", file, ...(input ? ["--in", input] : ["--save", out]), "--results", "--json-out", res, "--quiet"], { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] });
   } catch (e) {
@@ -27,10 +38,40 @@ function run(group, name, script, out, input) {
   return Array.isArray(parsed) ? parsed : parsed.results || parsed;
 }
 
-function buildPart(part) {
+// The app resolves file paths itself, so relative ones (linked part files, BOM output) are made absolute.
+const absPaths = (commands) => commands.map((c) => {
+  const p = c.params || {};
+  return p.path && !path.isAbsolute(p.path) ? { command: c.command, params: Object.assign({}, p, { path: path.join(ROOT, p.path) }) } : c;
+});
+
+async function runInApp(name, script, out, input, res) {
+  if (!app) app = await require("./lib/control").Control.open();
+  let tab = null;
+  try {
+    if (input) {
+      await app.execute("doc.open", { path: path.resolve(ROOT, input) });       // opens in a tab of its own
+    } else {
+      await app.call("ui.documents", { action: "new" });
+    }
+    tab = (await app.call("ui.documents", {})).active;
+    const reply = await app.request("engine.script", { commands: absPaths(script.commands) });
+    const results = reply.ok ? (Array.isArray(reply.result) ? reply.result : reply.result.results) : (reply.results || []);
+    fs.writeFileSync(res, JSON.stringify(reply, null, 1));
+    if (!reply.ok) { console.log(`FAILED ${name}: ${reply.error}`); return null; }
+    if (out) await app.execute("file.save_as", { path: path.resolve(ROOT, out) });
+    return results;
+  } catch (e) {
+    console.log(`FAILED ${name}: ${e.message}`);
+    return null;
+  } finally {
+    if (tab !== null && tab !== undefined) await app.call("ui.documents", { action: "close", index: tab, force: true }).catch(() => {});
+  }
+}
+
+async function buildPart(part) {
   const p = part.make();
   const script = p.script();
-  const results = run("parts", part.key, script, part.file);
+  const results = await run("parts", part.key, script, part.file);
   if (!results) return false;
   const loose = [];
   let k = 0;
@@ -51,7 +92,7 @@ function buildPart(part) {
 
 // A part placed on both sides must be its own mirror image about its declared plane: mirror the body,
 // intersect it with the original and compare volumes. Nothing is saved.
-function checkSymmetry(part) {
+async function checkSymmetry(part) {
   const { val } = require("./lib/dsl");
   const i = "xyz".indexOf(part.sym.axis), origin = [0, 0, 0], normal = [0, 0, 0];
   origin[i] = val(part.sym.about || 0); normal[i] = 1;
@@ -61,34 +102,121 @@ function checkSymmetry(part) {
     { command: "solid.combine", params: { target: part.body, tools: [part.body + " (2)"], operation: "intersect" } },
     { command: "inspect.measure", params: { summary: true } },
   ] };
-  const results = run("parts", part.key + ".symmetry", script, null, part.file);
+  const results = await run("parts", part.key + ".symmetry", script, null, part.file);
   if (!results) return false;
-  const v0 = results[0].total.volume_mm3, v1 = results[3].total.volume_mm3;
+  const measured = (r) => (r.result || r).total.volume_mm3;
+  const v0 = measured(results[0]), v1 = measured(results[3]);
   const same = Math.abs(v1 - v0) <= 1e-5 * v0;
   console.log(`${same ? "ok    " : "CHECK "} ${part.key}: mirror plane ${part.sym.axis} = ${origin[i]}; volume ${v0.toFixed(1)} mm3, shared with its mirror image ${v1.toFixed(1)} mm3`);
   return same;
 }
 
-const [what = "all", ...names] = process.argv.slice(2);
-let ok = true;
-if (what === "parts" || what === "all") {
-  const parts = require("./parts");
-  for (const key of names.length ? names : Object.keys(parts)) {
-    if (!parts[key]) { console.log("unknown part " + key); ok = false; continue; }
-    ok = buildPart(parts[key]) && ok;
+// Check the connection to the open app; list the commands whose id contains one of the given words.
+async function ping() {
+  const c = await require("./lib/control").Control.open();
+  console.log(`connected to port ${c.port}; capabilities:`, JSON.stringify(await c.call("control.capabilities")));
+  const cmds = await c.call("engine.commands");
+  const list = Array.isArray(cmds) ? cmds : cmds.commands || [];
+  console.log(`${list.length} commands`);
+  for (const k of list) if (names.some((n) => String(k.id).includes(n))) console.log(" ", k.id, "-", k.label, k.params ? "| " + JSON.stringify(k.params).slice(0, 1500) : "");
+  c.close();
+  return true;
+}
+
+// Camera views rendered by `check` (mm and radians; yaw about Z from +X, pitch up from the XY plane).
+const VIEWS = {
+  robot: {
+    iso: { view: "iso" },
+    bottom: { view: "bottom" },
+    left: { view: "left" },
+  },
+  leg: { iso: { view: "iso" }, front: { view: "front" } },
+};
+
+// Clash check of the robot with the given joints driven, e.g. all abduction joints to -45 and 45 degrees:
+//   node cad/scripts/build.js pose HipAbduction -45 45 --app
+async function pose(prefix, angles) {
+  if (!APP) { console.log("pose runs through the app: add --app"); return false; }
+  app = app || (await require("./lib/control").Control.open());
+  await app.execute("doc.open", { path: path.join(ROOT, "cad", "robot", "robot.sc") });
+  const tab = (await app.call("ui.documents", {})).active;
+  try {
+    const joints = ["FL", "FR", "RL", "RR"].map((l) => `${prefix}_${l}`);
+    for (const a of angles) {
+      const commands = joints.map((joint) => ({ command: "joint.drive", params: { joint, value: Number(a), quiet: true } }));
+      commands.push({ command: "inspect.interference", params: { budget_s: 900 } });
+      const batch = await app.call("engine.batch", { commands, rollback: false });
+      const r = batch.results[batch.results.length - 1];
+      const list = r.interferences || [];
+      console.log(`${prefix} ${a} deg: ${list.length} overlapping pairs`);
+      for (const f of list) console.log(`  ${f.a}  x  ${f.b}: ${(+f.volume_mm3 || 0).toFixed(1)} mm3`);
+    }
+    return true;
+  } finally {
+    await app.call("ui.documents", { action: "close", index: tab, force: true }).catch(() => {});
   }
 }
-if (what === "symmetry") {
-  const parts = require("./parts");
-  for (const part of Object.values(parts)) if (part.sym) ok = checkSymmetry(part) && ok;
-}
-if (what === "leg" || what === "robot" || what === "all") {
-  const asm = require("./assemblies");
-  for (const key of what === "all" ? ["leg", "robot"] : [what]) {
-    const a = asm[key]();
-    const results = run(key, key, { commands: a.cmds }, a.file);
-    if (!results) { ok = false; continue; }
-    console.log(`ok     ${key}: ${a.cmds.length} commands -> ${a.file}`);
+
+// Clash check (and renders) of a saved assembly: node cad/scripts/build.js check robot|leg --app
+async function check(key) {
+  if (!APP) { console.log("check runs through the app: add --app"); return false; }
+  app = app || (await require("./lib/control").Control.open());
+  const dir = path.join(ROOT, "cad", key, "build");
+  fs.mkdirSync(dir, { recursive: true });
+  await app.execute("doc.open", { path: path.join(ROOT, "cad", key, key + ".sc") });
+  const tab = (await app.call("ui.documents", {})).active;
+  try {
+    // engine.batch, not engine.execute: it may run for up to an hour instead of 60 s
+    const batch = await app.call("engine.batch", { commands: [{ command: "inspect.interference", params: { budget_s: 900 } }], rollback: false });
+    const r = batch.results[0];
+    fs.writeFileSync(path.join(dir, "interference.json"), JSON.stringify(r, null, 1));
+    const list = r.interferences || [];
+    console.log(`${key}: ${r.checked ?? "?"} bodies checked, ${list.length} overlapping pairs, ${(r.unchecked || []).length} unchecked`);
+    for (const f of list) {
+      const where = (p) => (p && p.path ? p.path.join("/") : "");
+      console.log(`  ${f.a} [${where(f.a_part)}]  x  ${f.b} [${where(f.b_part)}]: ${(+f.volume_mm3 || +f.volume || 0).toFixed(1)} mm3`);
+    }
+    for (const u of r.unchecked || []) console.log(`  unchecked ${u.a} x ${u.b}: ${u.reason}`);
+    for (const [name, v] of Object.entries(VIEWS[key] || {})) {
+      await app.execute("view.apply", v);
+      const file = path.join(dir, `render_${name}.png`);
+      await app.call("ui.render", { path: file, width: 1400, height: 900 });
+      console.log(`  render ${path.relative(ROOT, file)}`);
+    }
+    return true;
+  } finally {
+    await app.call("ui.documents", { action: "close", index: tab, force: true }).catch(() => {});
   }
 }
-process.exit(ok ? 0 : 1);
+
+async function main() {
+  let ok = true;
+  if (what === "ping") return ping();
+  if (what === "pose") return pose(names[0], names.slice(1));
+  if (what === "check") { for (const k of names.length ? names : ["robot"]) ok = (await check(k)) && ok; return ok; }
+  if (what === "parts" || what === "all") {
+    const parts = require("./parts");
+    for (const key of names.length ? names : Object.keys(parts)) {
+      if (!parts[key]) { console.log("unknown part " + key); ok = false; continue; }
+      ok = (await buildPart(parts[key])) && ok;
+    }
+  }
+  if (what === "symmetry") {
+    const parts = require("./parts");
+    for (const part of Object.values(parts)) if (part.sym) ok = (await checkSymmetry(part)) && ok;
+  }
+  if (what === "leg" || what === "robot" || what === "all") {
+    const asm = require("./assemblies");
+    for (const key of what === "all" ? ["leg", "robot"] : [what]) {
+      const a = asm[key]();
+      const results = await run(key, key, { commands: a.cmds }, a.file);
+      if (!results) { ok = false; continue; }
+      console.log(`ok     ${key}: ${a.cmds.length} commands -> ${a.file}`);
+    }
+  }
+  return ok;
+}
+
+main()
+  .then((ok) => { if (app) app.close(); process.exit(ok ? 0 : 1); })
+  .catch((e) => { console.log("FAILED: " + e.message); process.exit(1); });
