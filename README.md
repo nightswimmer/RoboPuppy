@@ -5,7 +5,7 @@ A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts 
 ![Side view](cad/robot/robot_side.png)
 
 ## Status
-First detailed design pass. The whole robot is modelled as an articulated assembly: torso, four legs, neck, head and tail. Fasteners, servo mounts and some drive details are still missing, and nothing has been built yet.
+First detailed design pass. The whole robot is modelled as an articulated assembly: torso, four legs, neck, head and tail. Every part is its own file, linked into the assemblies, so the bill of materials comes straight from the model. Fasteners, servo mounts and some drive details are still missing, and nothing has been built yet.
 
 ## Design targets
 - Torso about 60 cm long, with the rest scaled to a dog of that size
@@ -21,14 +21,15 @@ First detailed design pass. The whole robot is modelled as an articulated assemb
 | Neck tilt, head pan, tail wag, tail lift | Feetech STS-family serial bus servos |
 
 ## Design
-![Hip detail](cad/robot/robot_hip_detail.png)
+![Robot](cad/robot/robot_iso.png)
 
 - **Legs:** an abduction actuator on the torso, a hip-pitch actuator in a printed carrier, and a knee actuator at the hip that drives the knee through a 1.5:1 HTD 5M belt between two laser-cut thigh plates. The shank, knee pulley and foot core are one printed part.
+- **Shared parts:** left and right legs are mirror images built from the same parts. Each fabricated part is symmetric, or works turned over, so one print or cut file serves both sides. One hip carrier design fits all four hips.
 - **Torso:** each pair of abduction actuators is clamped between two aluminium plates. A printed belly pan forms the central bay and an aluminium deck closes the top.
 - **Neck and head:** a tilt servo on the deck nods the whole neck; a pan servo at the top of the neck turns a hollow printed head with a camera behind each eye.
 - **Tail:** a wag servo and a lift servo at the tail root move a flexible TPU tail.
 
-![Head detail](cad/robot/robot_head_detail.png)
+![Leg](cad/leg/leg.png)
 
 | Measure | Value |
 |---|---|
@@ -39,20 +40,22 @@ First detailed design pass. The whole robot is modelled as an articulated assemb
 | Back height, standing | about 470 mm |
 | Estimated mass | 10.5–11.2 kg |
 
-## Repository
-- `cad/actuators/` – RobStride 01 reference model
-- `cad/leg/` – detailed leg
-- `cad/robot/` – whole-robot model and renders
-- `cad/scripts/` – generator scripts
+The bill of materials is in [cad/robot/bom.csv](cad/robot/bom.csv): 24 items, 18 of them fabricated.
 
-The models are generated from scripts. To rebuild after changing a dimension:
+## Repository
+- `cad/parts/` – one design file per unique part, purchased parts included
+- `cad/leg/` – single-leg assembly
+- `cad/robot/` – whole-robot assembly, renders and bill of materials
+- `cad/scripts/` – generators: `dims.js` (all dimensions), `parts.js` (the parts), `assemblies.js` (leg and robot), `build.js` (runs them)
+- `cad/actuators/` – RobStride 01 reference model from the official drawing
+- `.claude/skills/cad-modelling/` – the modelling conventions the generators follow
+
+The models are generated from scripts. Every feature comes from a fully constrained sketch, and all dimensions live in one table. To rebuild after changing a dimension (needs SolidCraft installed), run from the repository root:
 
 ```
-node cad/scripts/gen_leg.js
-solidcraft-cli run cad/leg/build/leg_detailed.json --save cad/leg/leg_detailed.sc
-
-node cad/scripts/gen_robot.js
-solidcraft-cli run cad/robot/build/robot.json --save cad/robot/robot.sc
+node cad/scripts/build.js all            # every part, then the leg and the robot
+node cad/scripts/build.js parts shank    # one part
+node cad/scripts/build.js symmetry       # check that parts used on both sides equal their mirror image
 ```
 
 Production files (cut files, print files, STEP) are not stored in the repository. They will be exported once the design is complete.

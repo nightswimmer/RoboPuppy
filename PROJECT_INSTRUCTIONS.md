@@ -28,28 +28,34 @@ A Labrador-sized robotic dog built from 3D-printed and laser-cut parts, designed
 - **Torso:** each pair of abduction actuators is clamped between a bulkhead and a mid frame (3 mm aluminium). A printed belly pan spans between the mid frames; a 2 mm aluminium deck closes the top and extends as a spine to the neck and tail. Lower corners are rounded about the abduction axes and the top is only 120 mm wide, so the thighs can swing past.
 - **Knee direction:** all four knees bend backward.
 - **Battery:** 10S Li-ion (36 V). About 180 Wh (10S1P, ~0.8 kg) gives roughly 1 h; about 360 Wh (10S2P, ~1.5 kg) gives roughly 2 h. Estimated draw is 40–60 W standing, 120–200 W trotting, 0.5–1 kW peaks.
+- **Shared parts across sides:** the assembly is mirrored left to right, but every fabricated part must be the same on both sides (owner's rule). Parts are symmetric or work turned over. The hip carrier has the actuator hole pattern every 60° and a plug slot top and bottom, so one carrier fits all four hips with the actuator plug pointing up.
+- **Joint directions:** hip pitch and knee turn about +Y on every leg; positive abduction is outward on both sides. Actuator flange convention: a dowel pin in line with the plug, M4 holes 30° off.
 - **Mass:** target about 11 kg; current estimate 10.5–11.2 kg (the head shell is about 230 g and the tail 137 g if solid; both should be lightened).
 
 ## Tooling
 - SolidCraft is driven by Claude through its MCP connector (`solidcraft` server). The connector must be started with `--allow-path` pointing at this repo (set in the user-level `.claude.json`), otherwise it cannot save here.
-- **Models are generated, not hand-edited.** Node scripts in `cad/scripts/` write command scripts to `cad/*/build/` (git-ignored), and `solidcraft-cli run <script.json> --save <file.sc>` builds each model headlessly. Change dimensions in the scripts, then rebuild:
-  - `lib_leg.js` – leg dimensions and geometry, shared by the two generators below.
-  - `gen_leg.js` – single leg (`cad/leg/leg_detailed.sc`).
-  - `gen_robot.js` – whole robot (`cad/robot/robot.sc`), torso dimensions at the top.
-- The MCP connector is used for looking at the result: renders, joint sweeps and collision checks.
-- If the SolidCraft window already has a file open, reopening the same path does not reload it; open a blank design first.
-- Joint sweep replies are very large; they are saved to a file and the stop points extracted with a script.
+- **Modelling rules** are in the `cad-modelling` skill (`.claude/skills/cad-modelling/SKILL.md`; the owner plans to move it to the personal skills folder). In short: one file per part, reuse by instancing, same parts on both sides, fully constrained sketches, one sketch and one hole feature per hole group, patterns and mirrors for repeats.
+- **Models are generated, not hand-edited.** Node scripts in `cad/scripts/` write command scripts to `cad/*/build/` (git-ignored) and run them with `solidcraft-cli` (installed at `C:\Program Files\SolidCraft\`, not on PATH). Run from the repo root:
+  - `node cad/scripts/build.js all` builds every part, then the leg and the robot. `parts <key>` builds one part.
+  - `node cad/scripts/build.js symmetry` checks that every part used on both sides equals its own mirror image.
+  - A part build fails if any sketch is not fully constrained.
+- **Generator files:** `dims.js` (every dimension, passed to the part files as named parameters), `parts.js` (one definition per part), `assemblies.js` (leg modules, leg and robot), `build.js` (runner), `lib/` (sketch helpers and placement maths).
+- **How assemblies are structured:** SolidCraft flattens a linked assembly file (its part list and joints are lost), so only part files are linked. The leg is defined once in `assemblies.js` as three rigid modules (hip, thigh, lower leg). In the robot, modules are local sub-assemblies placed twice or four times: two hip modules and two thigh modules (one per hand), one lower leg. A right-hand module places the same part files in mirrored positions; the build refuses a mirrored part.
+- The MCP connector is used for looking at the result: renders, joint sweeps and clash checks (`inspect.interference`).
+- If a file is already open in the connector, reopening the same path does not reload it; open a blank design first.
+- Joint sweep and joint list replies are very large; save them to a file and extract what is needed with a script.
 
 ## Repository layout
-- `cad/actuators/` – RobStride 01 reference model (simplified envelope with the real bolt patterns).
-- `cad/leg/` – detailed single leg and renders.
-- **No production files in the repo** (owner's decision): DXF, 3MF and STEP exports go to `cad/*/export/`, which is git-ignored, and are only produced once the whole design is complete. `node cad/scripts/gen_leg.js --export` writes the plate DXFs and the export script.
-- `cad/robot/` – whole-robot model (`robot.sc`) and renders.
+- `cad/parts/` – one design file per unique part (26 files), purchased parts and keep-out volumes included.
+- `cad/leg/` – single-leg assembly (`leg.sc`, front-left leg on a bulkhead), render and BOM.
+- `cad/robot/` – whole-robot assembly (`robot.sc`, saved in the standing pose), renders and `bom.csv` (24 items).
 - `cad/scripts/` – generators.
+- `cad/actuators/` – older RobStride 01 reference model from the official drawing; the assemblies use `cad/parts/robstride01.sc`.
+- **No production files in the repo** (owner's decision): DXF, 3MF and STEP exports go to `cad/*/export/`, which is git-ignored, and are only produced once the whole design is complete. The export step has not been rewritten for the new part files yet.
 - Superseded, kept for now: `cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.*`, `cad/scripts/gen_blockout.js`.
 
 ## Current state
-First detailed pass. The whole robot exists as one articulated model (16 joints): a detailed torso, four detailed legs with real bolt patterns, and a neck, head and tail built around servo positions. Clearances are checked on the front-left leg and on the neck, head and tail joints. Nothing has been printed or cut; see HANDOFF.md for what is missing before a first test build.
+First detailed pass, restructured into linked part files. The whole robot is one articulated assembly (16 joints): a detailed torso, four detailed legs with real bolt patterns, and a neck, head and tail built around servo positions. Geometry is the same as before the restructuring apart from the hip carrier changes above. Joint clearance sweeps were done on the old model and have not been rerun. Nothing has been printed or cut; see HANDOFF.md for what is missing before a first test build.
 
 ## Coordinate convention
-X forward, Y left, Z up. Origin at the torso centre, at the height of the hip abduction axes. Leg-local frame: origin where the abduction axis meets the hip pitch axis, Y outward.
+X forward, Y left, Z up. Origin at the torso centre, at the height of the hip abduction axes. Leg-local frame: origin where the abduction axis meets the hip pitch axis, Y outward. Each part file has its own frame, described in a comment above the part in parts.js.

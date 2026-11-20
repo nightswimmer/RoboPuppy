@@ -1,7 +1,20 @@
 # Handoff – what's left to do
 
 ## Open question for the owner
-- Remove the superseded files? (`cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.sc` and its two renders, `cad/scripts/gen_blockout.js`.) Asked, not yet answered.
+- Remove the remaining superseded files? (`cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.sc` and its two renders, `cad/scripts/gen_blockout.js`, and `cad/actuators/RS01_reference.sc`, now replaced by `cad/parts/robstride01.sc`.) Asked, not yet answered.
+- Which of the clashes below should be fixed, and how?
+
+## Clashes found in the model (all present before the restructuring)
+- **Shank and foot pad:** the shank blade passes through the TPU pad ring on every leg (about 2,500 mm³). Shorten the blade to the foot core or notch the pad.
+- **Battery keep-out and belly pan:** the lower corners of the 200 × 110 × 72 keep-out cut into the pan's rounded corners (inner radius 33 about each abduction axis).
+- **Yoke arms and servos:** the neck and tail yoke arms (Ø10 at 22 mm from the centreline) overlap their servo bodies by 0.5 mm. Move the arms out or thin them.
+- **Tail rod and yoke:** the rod starts inside the yoke bridge; this goes away once the TPU attachment is designed.
+
+## Modelling and tooling
+- **Skill:** the owner will move `.claude/skills/cad-modelling/` to the personal skills folder and may add a project-specific skill. The owner has more modelling issues to add to it.
+- **Export step:** not rewritten for the new part files. Plates can be exported with `sheet.export_dxf` or from the part bodies; printed parts as 3MF from their part files.
+- **Countersinks:** adding them to the thigh plates makes the plates one-sided. The outline is not symmetric front to back, so a countersunk plate would no longer serve both sides: countersink both faces, or make the hole layout symmetric.
+- **RobStride plug stub** in `robstride01.sc` is a guessed size (14 wide, 10 radial); replace with the real connector envelope.
 
 ## Leg
 - **Pulley teeth:** model the HTD 5M tooth profile on the hip pulley (24T) and the knee pulley on the shank (36T). Until then those two parts are not printable as working parts. This blocks a test print of the knee drive.
@@ -10,7 +23,6 @@
 - **Carrier:** first shape, no stress check, no fillets. Flange screws go in from inside the cup before the hip-pitch actuator is fitted.
 - **Bearings, screws, cable routing:** not modelled.
 - **Shank blade** (30 × 13 mm printed section): hand estimate about 18 MPa bending at 150 N; consider a carbon tube insert.
-- Confirm the plate DXFs serve all four legs (shapes are mirror-symmetric in the model; not checked hole by hole).
 
 ## Torso
 - **Joints between parts:** nothing fastens the belly pan, mid frames, bulkheads and deck to each other yet. Add brackets or tabs.
@@ -30,6 +42,7 @@
 - Head pan was swept clear to 62° before the check ran out of time; rerun to 70°.
 
 ## Checks still to run
+- All sweeps below were run on the old single-file model. Rerun them on the new `robot.sc`; the joint names are the same, but hip and knee now turn about +Y on every leg, so right-leg angles keep their sign.
 - Clearance sweeps on the other three legs (only front-left was swept fully; rear-left partly).
 - Hip pitch sweeps ran out of time budget at 114° back and 44° forward without finding a collision; rerun with a larger budget to find the true limits.
 - Set real joint limits from the sweeps. Found so far on front-left in the standing pose: inward 38° (opposite leg), outward 36° (carrier meets the deck spine), knee fold 152° (blade meets a spacer; limit set to 145°).
