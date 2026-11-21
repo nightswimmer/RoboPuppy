@@ -100,6 +100,23 @@ class Sketch {
     if (!centred) this.place(first, c0[0], c0[1]);
     this.hv(first, second, Math.abs(a[0] - b[0]) < 1e-9 ? "vertical" : "horizontal");
   }
+  // Outline of two circles joined by their outer tangent lines: radius r0 about the origin, r1 about
+  // (0, -L) (a tapered link). Two arcs and two lines, tangent where they meet. Use it in a sketch of its own:
+  // the points it creates are not tracked.
+  taper(r0, L, r1) {
+    const R = val(r0), r = val(r1), Lv = val(L), al = Math.asin((R - r) / Lv), c = Math.cos(al), s = Math.sin(al);
+    const a1 = "a" + (this.n.a + 1), a2 = "a" + (this.n.a + 2), l1 = "l" + (this.n.l + 1), l2 = "l" + (this.n.l + 2);
+    this.cmd("sketch.arc.center_point", { center: [0, 0], start: [r4(R * c), r4(R * s)], end: [r4(-R * c), r4(R * s)] });
+    this.cmd("sketch.arc.center_point", { center: [0, r4(-Lv)], start: [r4(-r * c), r4(-Lv + r * s)], end: [r4(r * c), r4(-Lv + r * s)] });
+    this.cmd("sketch.line", { points: [a2 + ".end", a1 + ".start"] });
+    this.cmd("sketch.line", { points: [a1 + ".end", a2 + ".start"] });
+    this.n.a += 2; this.n.l += 2;
+    this.dim([a1], r0, "radius");
+    this.dim([a2], r1, "radius");
+    this.hv("origin", a2 + ".center", "vertical");
+    this.dim(["origin", a2 + ".center"], L, "vertical");
+    for (const l of [l1, l2]) for (const a of [a1, a2]) this.cmd("sketch.constraint.tangent", { a: l, b: a });
+  }
   // Patterns and mirrors come last in a sketch: the ids they create are not tracked.
   pattern(entities, center, count) {
     this.cmd("sketch.pattern.circular", { entities, center: center === "origin" ? "origin" : center.id, count });

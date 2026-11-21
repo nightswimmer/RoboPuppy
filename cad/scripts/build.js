@@ -2,8 +2,10 @@
 //   node cad/scripts/build.js parts [key...]   every part file (or the ones named) -> cad/parts/<key>.sc
 //   node cad/scripts/build.js leg              single leg assembly                 -> cad/leg/leg.sc
 //   node cad/scripts/build.js robot            whole robot assembly                -> cad/robot/robot.sc
-//   node cad/scripts/build.js all              parts, then both assemblies
-//   node cad/scripts/build.js symmetry         check that every part used on both sides equals its own mirror image
+//   node cad/scripts/build.js leg_linkage      single leg, linkage knee variant    -> cad/leg/leg_linkage.sc
+//   node cad/scripts/build.js robot_linkage    whole robot, linkage knee variant   -> cad/robot/robot_linkage.sc
+//   node cad/scripts/build.js all              parts, then all four assemblies
+//   node cad/scripts/build.js symmetry [key...] check that every part used on both sides (or the ones named) equals its own mirror image
 //   node cad/scripts/build.js ping [words...]  check the connection to the open app (lists commands matching the words)
 // Add --app to run through the open SolidCraft desktop app (its control channel) instead of
 // solidcraft-cli, for example when Windows will not start the CLI. Each script then runs in a new
@@ -18,6 +20,11 @@ const ROOT = path.join(__dirname, "..", "..");
 const args = process.argv.slice(2);
 const APP = args.includes("--app");
 const [what = "all", ...names] = args.filter((a) => a !== "--app");
+// Saved assemblies: key -> [folder under cad/, file]
+const ASSEMBLIES = {
+  leg: ["leg", "leg.sc"], robot: ["robot", "robot.sc"],
+  leg_linkage: ["leg", "leg_linkage.sc"], robot_linkage: ["robot", "robot_linkage.sc"],
+};
 let app = null;                     // control channel connection, opened on first use
 
 // Runs a command script, saved to `out` (or applied to the design file `input` without saving).
@@ -132,13 +139,16 @@ const VIEWS = {
   },
   leg: { iso: { view: "iso" }, front: { view: "front" } },
 };
+VIEWS.robot_linkage = VIEWS.robot;
+VIEWS.leg_linkage = VIEWS.leg;
 
 // Clash check of the robot with the given joints driven, e.g. all abduction joints to -45 and 45 degrees:
 //   node cad/scripts/build.js pose HipAbduction -45 45 --app
-async function pose(prefix, angles) {
+//   node cad/scripts/build.js pose robot_linkage Knee -45 -140 --app    (another saved robot)
+async function pose(key, prefix, angles) {
   if (!APP) { console.log("pose runs through the app: add --app"); return false; }
   app = app || (await require("./lib/control").Control.open());
-  await app.execute("doc.open", { path: path.join(ROOT, "cad", "robot", "robot.sc") });
+  await app.execute("doc.open", { path: path.join(ROOT, "cad", ...ASSEMBLIES[key]) });
   const tab = (await app.call("ui.documents", {})).active;
   try {
     const joints = ["FL", "FR", "RL", "RR"].map((l) => `${prefix}_${l}`);
@@ -161,15 +171,16 @@ async function pose(prefix, angles) {
 async function check(key) {
   if (!APP) { console.log("check runs through the app: add --app"); return false; }
   app = app || (await require("./lib/control").Control.open());
-  const dir = path.join(ROOT, "cad", key, "build");
+  if (!ASSEMBLIES[key]) { console.log("unknown assembly " + key); return false; }
+  const dir = path.join(ROOT, "cad", ASSEMBLIES[key][0], "build");
   fs.mkdirSync(dir, { recursive: true });
-  await app.execute("doc.open", { path: path.join(ROOT, "cad", key, key + ".sc") });
+  await app.execute("doc.open", { path: path.join(ROOT, "cad", ...ASSEMBLIES[key]) });
   const tab = (await app.call("ui.documents", {})).active;
   try {
     // engine.batch, not engine.execute: it may run for up to an hour instead of 60 s
     const batch = await app.call("engine.batch", { commands: [{ command: "inspect.interference", params: { budget_s: 900 } }], rollback: false });
     const r = batch.results[0];
-    fs.writeFileSync(path.join(dir, "interference.json"), JSON.stringify(r, null, 1));
+    fs.writeFileSync(path.join(dir, `${key}_interference.json`), JSON.stringify(r, null, 1));
     const list = r.interferences || [];
     console.log(`${key}: ${r.checked ?? "?"} bodies checked, ${list.length} overlapping pairs, ${(r.unchecked || []).length} unchecked`);
     for (const f of list) {
@@ -179,7 +190,7 @@ async function check(key) {
     for (const u of r.unchecked || []) console.log(`  unchecked ${u.a} x ${u.b}: ${u.reason}`);
     for (const [name, v] of Object.entries(VIEWS[key] || {})) {
       await app.execute("view.apply", v);
-      const file = path.join(dir, `render_${name}.png`);
+      const file = path.join(dir, `${key}_render_${name}.png`);
       await app.call("ui.render", { path: file, width: 1400, height: 900 });
       console.log(`  render ${path.relative(ROOT, file)}`);
     }
@@ -192,7 +203,7 @@ async function check(key) {
 async function main() {
   let ok = true;
   if (what === "ping") return ping();
-  if (what === "pose") return pose(names[0], names.slice(1));
+  if (what === "pose") return ASSEMBLIES[names[0]] ? pose(names[0], names[1], names.slice(2)) : pose("robot", names[0], names.slice(1));
   if (what === "check") { for (const k of names.length ? names : ["robot"]) ok = (await check(k)) && ok; return ok; }
   if (what === "parts" || what === "all") {
     const parts = require("./parts");
@@ -203,13 +214,13 @@ async function main() {
   }
   if (what === "symmetry") {
     const parts = require("./parts");
-    for (const part of Object.values(parts)) if (part.sym) ok = (await checkSymmetry(part)) && ok;
+    for (const part of Object.values(parts)) if (part.sym && (!names.length || names.includes(part.key))) ok = (await checkSymmetry(part)) && ok;
   }
-  if (what === "leg" || what === "robot" || what === "all") {
+  if (ASSEMBLIES[what] || what === "all") {
     const asm = require("./assemblies");
-    for (const key of what === "all" ? ["leg", "robot"] : [what]) {
+    for (const key of what === "all" ? Object.keys(ASSEMBLIES) : [what]) {
       const a = asm[key]();
-      const results = await run(key, key, { commands: a.cmds }, a.file);
+      const results = await run(ASSEMBLIES[key][0], key, { commands: a.cmds }, a.file);
       if (!results) { ok = false; continue; }
       console.log(`ok     ${key}: ${a.cmds.length} commands -> ${a.file}`);
     }

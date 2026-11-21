@@ -49,6 +49,21 @@ module.exports = {
   axle_bore_d: 10, seat_d: 16, seat_out: 4.6, seat_in: 5.1,
   foot_pad_od: 56,
 
+  // ---- leg, linkage knee variant (leg_linkage.sc, robot_linkage.sc) ----
+  // The knee actuator turns a crank; a pushrod runs down the thigh to a lever on the shank (a four-bar).
+  // Knee fold range 45-140 deg; ratio 1.42:1 standing, at least 1.29:1 everywhere, rising toward both ends.
+  cav_lk: 20,            // cavity between the plates (M3 x 20 standoffs)
+  lk_knee_r: 18,         // plate end radius at the knee; the hip end keeps plate_w/2
+  lk_a: 26,              // crank: knee actuator axis to rod pin
+  lk_b: 34,              // shank lever: knee axis to rod pin, along the shank axis above the knee
+  lk_c: 244.2,           // pushrod: rod-end ball centre to ball centre
+  crank_t: 6, crank_hub_d: 40, crank_arm_w: 13, crank_cb_d: 8, crank_cb_depth: 3,   // 6 mm aluminium crank, counterbored M4
+  re_d: 18, re_t: 6, re_ball_d: 11, re_ball_w: 8, re_neck_d: 7, re_neck: 14, re_bore_d: 5,   // M5 male rod end (SA5 T/K size), envelope
+  rod_d: 8, rod_end_gap: 18, rod_thread: 15,   // pushrod; it starts rod_end_gap from each ball centre (rod-end neck + jam nut)
+  lk_hub_d: 24, lever_w: 20, lk_seat: 5,       // shank hub, lever width, 688 bearing seat depth at each end
+  lk_sp_bore_d: 44, lk_sp_x0: 8,               // hip spacer: bore around the crank hub; rear edge clear of the crank and rod
+  lk_so_x1: 26, lk_so_z1: 95, lk_so_x2: 15, lk_so_z2: 185,   // standoffs, all in the front half (the rod runs at the rear)
+
   // ---- torso ----
   hip_x: 210,            // hip pitch axes, fore/aft from centre
   abd_y: 42,             // abduction axes, lateral from the centreline

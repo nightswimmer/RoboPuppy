@@ -1,11 +1,52 @@
 # Handoff – what's left to do
 
+## Next session: migrate the CAD to Onshape
+The owner decided to leave SolidCraft. The deciding requirement: **in the assembly, any part can be clicked and dragged with the mouse, and the legs move along their joints**, while the legs stay grouped (sub-assemblies, not a flat list). SolidCraft cannot do this (see PROJECT_INSTRUCTIONS.md, Tooling). Onshape drags a placed sub-assembly along its mates when any of its parts is grabbed. Confirm this early, on a small test assembly, before migrating everything.
+
+### Decide first, with the owner
+1. **How the model is built:**
+   - **Generated:** Node scripts calling the Onshape REST API, or FeatureScript Part Studios driven by variables. This keeps one dimension table and rebuildable parts, like now.
+   - **By hand in Onshape:** quicker to start, but loses the generator.
+   - Recommendation: keep `dims.js` as the single source and generate. Parts in one or more Part Studios driven by variables or configuration variables, then assemblies with mates.
+2. **Onshape plan:** documents on the free plan are public. Check that the owner is fine with that, or uses a paid or education plan.
+3. **API access (if generated):** the owner creates API keys in the Onshape developer portal. Keep the keys out of the repo (environment variables, or a git-ignored file), and add that file to `.gitignore` before the first run.
+4. **What happens to the SolidCraft files** (`cad/parts/*.sc`, the assemblies, `cad/scripts/`) once Onshape holds the model: keep them as an archive, or delete them.
+5. **Which knee variant to carry over:** belt, linkage, or both (both exist now; see below).
+
+### What has to carry over (it all lives in the current scripts)
+- **Dimensions:** `cad/scripts/dims.js`, every dimension, with comments on what drives what.
+- **Parts:** `cad/scripts/parts.js`, 38 parts, each with its sketches, constraints, hole groups, mirror plane (`sym`), part number and made/purchased type. Part frames are described in comments.
+- **Assemblies:** `cad/scripts/assemblies.js`.
+  - Leg modules: hip, thigh and lower leg, plus crank and rod for the linkage.
+  - Placements: the right-hand module is the same parts placed as mirror(T)·reflect(part's own plane), always a rigid move. The rear legs are the front modules turned or copied.
+  - Joints: 16 revolute joints with limits, and the standing pose (hip 35°, knee −70°).
+  - Linkage loop: crank–thigh and rod–crank revolute, rod–lever ball. In Onshape: revolute mates plus a ball mate, or mate connectors, which should close the loop.
+  - `cad/scripts/lib/linkage.js` holds the four-bar maths for placing the crank and rod at a given knee angle.
+- **Rules:** the `cad-modelling` skill. In particular: one file per part, same fabricated parts on both sides, fully constrained sketches, one hole feature per hole group, BOM from the assembly structure. Check how each rule maps to Onshape: Part Studios versus one-part-per-studio, derived parts, configurations, Onshape's Hole feature, and its BOM.
+- **Checks to rebuild in Onshape:** sketch constraint status, mirror symmetry of shared parts, clash check (Onshape has interference detection in assemblies), BOM counts (27 items per robot variant).
+
+### Approach
+1. Small test first: one leg (hip, thigh, lower leg modules as sub-assemblies) with three revolute mates. Confirm that mouse dragging works the way the owner wants.
+2. Then the purchased parts (RobStride 01, servos, rod end, standoffs), then the made parts, in the order of `parts.js`.
+3. Then the leg and the robot assemblies, the linkage loop, the BOM, and a clash check against the known clash list below.
+4. Update PROJECT_INSTRUCTIONS.md and README.md for the new tool.
+
+## Linkage knee (added in the last session; open points)
+- **Lever pin fastener:** the M5 pin through the shank lever sits 0.5 mm from the thigh plates, so it needs flush heads or a threaded insert in the printed lever.
+- **Lever strength:** the printed lever cheeks see about 22 MPa at peak torque (peak rod force about 750–1000 N). Use aluminium lever plates or a steel sleeve at the pin.
+- **Hip-pitch flange screws:** the rod passes about 1 mm over the hip-pitch actuator's flange screw heads at full extension; use low-profile heads. Screws are not modelled, so the clash check cannot see this.
+- **Crank orientation:** the crank's flange holes are not turned to match the actuator's hole pattern in the model (the motor model is static). Cosmetic.
+- **Rod ends:** both modelled as right-hand thread. Use one left-hand and one right-hand so the rod length (knee zero) can be adjusted without unbolting.
+- **Rod-end thread stud** not modelled.
+- **Checks not run on the linkage robot:** hip-pitch and abduction sweeps, and a continuous knee sweep (`joint.find_limits` stalls because the rod ends touch the crank and lever face to face; eight discrete knee angles were checked instead).
+- **Choose the variant:** belt or linkage, once the open points above are weighed.
+
 ## Open question for the owner
 - Remove the remaining superseded files? (`cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.sc` and its two renders, `cad/scripts/gen_blockout.js`, and `cad/actuators/RS01_reference.sc`, now replaced by `cad/parts/robstride01.sc`.) Asked, not yet answered.
 - Which of the clashes below should be fixed, and how?
 
 ## Clashes found in the model (all still present in the latest check)
-- **Shank and foot pad:** the shank blade passes through the TPU pad ring on every leg (about 2,500 mm³). Shorten the blade to the foot core or notch the pad.
+- **Shank and foot pad:** the shank blade passes through the TPU pad ring on every leg (about 2,500 mm³, both variants). Shorten the blade to the foot core or notch the pad.
 - **Battery keep-out and belly pan:** the lower corners of the 200 × 110 × 72 keep-out cut into the pan's rounded corners (inner radius 33 about each abduction axis).
 - **Yoke arms and servos:** the neck and tail yoke arms (Ø10 at 22 mm from the centreline) overlap their servo bodies by 0.5 mm. Move the arms out or thin them.
 - **Tail rod and yoke:** the rod starts inside the yoke bridge; this goes away once the TPU attachment is designed.
@@ -18,7 +59,8 @@
 - **Rear rib and wag servo:** the rib stops 1 mm short of the servo and does not grip it. Once the servo mount is designed, the rib could carry it.
 - **README images** (`cad/robot/robot_side.png`, `robot_iso.png`, `cad/leg/leg.png`) predate the spacer and ribs. Regenerate them. The named views in `build.js check` frame badly, so set explicit cameras or capture from the app by hand.
 
-## Modelling and tooling
+## Modelling and tooling (SolidCraft items lapse once the migration is done)
+- **SolidCraft bug worth reporting** (if the owner wants to): a click on a part inside a sub-assembly cannot drag the sub-assembly along its joints. `joint.reach` on the part answers "no joint places it: it is not connected to anything grounded", while the same move on the sub-assembly works.
 - **Smart App Control:** `solidcraft-cli.exe` and the `solidcraft` MCP connector are blocked by Windows because SolidCraft's Windows builds are unsigned. Use `build.js --app` with the desktop app open. Watch SolidCraft issue #8317 for signed builds.
 - **Skill:** the owner will move `.claude/skills/cad-modelling/` to the personal skills folder and may add a project-specific skill. The owner has more modelling issues to add to it.
 - **Export step:** not rewritten for the new part files. Plates can be exported with `sheet.export_dxf` or from the part bodies; printed parts as 3MF from their part files.
