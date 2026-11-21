@@ -4,7 +4,8 @@
 //   node cad/scripts/build.js robot            whole robot assembly                -> cad/robot/robot.sc
 //   node cad/scripts/build.js leg_linkage      single leg, linkage knee variant    -> cad/leg/leg_linkage.sc
 //   node cad/scripts/build.js robot_linkage    whole robot, linkage knee variant   -> cad/robot/robot_linkage.sc
-//   node cad/scripts/build.js all              parts, then all four assemblies
+//   node cad/scripts/build.js rig              motion test rig (simplified legs, flat) -> cad/robot/motion_rig.sc
+//   node cad/scripts/build.js all              parts, then all assemblies and the rig
 //   node cad/scripts/build.js symmetry [key...] check that every part used on both sides (or the ones named) equals its own mirror image
 //   node cad/scripts/build.js ping [words...]  check the connection to the open app (lists commands matching the words)
 // Add --app to run through the open SolidCraft desktop app (its control channel) instead of
@@ -24,6 +25,7 @@ const [what = "all", ...names] = args.filter((a) => a !== "--app");
 const ASSEMBLIES = {
   leg: ["leg", "leg.sc"], robot: ["robot", "robot.sc"],
   leg_linkage: ["leg", "leg_linkage.sc"], robot_linkage: ["robot", "robot_linkage.sc"],
+  rig: ["robot", "motion_rig.sc"],
 };
 let app = null;                     // control channel connection, opened on first use
 
@@ -246,7 +248,7 @@ async function main() {
     for (const part of Object.values(parts)) if (part.sym && (!names.length || names.includes(part.key))) ok = (await checkSymmetry(part)) && ok;
   }
   if (ASSEMBLIES[what] || what === "all") {
-    const asm = require("./assemblies");
+    const asm = Object.assign({}, require("./assemblies"), require("./rig"));
     for (const key of what === "all" ? Object.keys(ASSEMBLIES) : [what]) {
       const a = asm[key]();
       const results = await run(ASSEMBLIES[key][0], key, { commands: a.cmds }, a.file);

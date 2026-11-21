@@ -7,7 +7,7 @@ A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts,
 ## Status
 First detailed design pass. The whole robot is modelled as an articulated assembly: torso, four legs, neck, head and tail. Two knee drives are modelled side by side: a belt drive and a crank-and-pushrod linkage. Every part is its own file, linked into the assemblies, so the bill of materials comes straight from the model. Fasteners, servo mounts and some drive details are still missing, and nothing has been built yet.
 
-The leg actuators are now RobStride 02s, modelled from the official STEP file. The battery is changing from 10S to 13S2P; the model's battery space has not been resized yet. The pictures below still show the earlier RobStride 01 model.
+The leg actuators are now RobStride 02s, modelled from the official STEP file. A simplified motion rig of the whole robot is used to find the joint ranges by dragging the legs. The battery is changing from 10S to 13S2P; the model's battery space has not been resized yet. The pictures below still show the earlier RobStride 01 model.
 
 ## Design targets
 - Torso about 60 cm long, with the rest scaled to a dog of that size
@@ -51,8 +51,8 @@ The bills of materials are in [cad/robot/bom.csv](cad/robot/bom.csv) (belt knee:
 ## Repository
 - `cad/parts/` – one design file per unique part, purchased parts included
 - `cad/leg/` – single-leg assemblies (`leg.sc` belt, `leg_linkage.sc` linkage)
-- `cad/robot/` – whole-robot assemblies (`robot.sc`, `robot_linkage.sc`), renders and bills of materials
-- `cad/scripts/` – generators: `dims.js` (all dimensions), `parts.js` (the parts), `assemblies.js` (legs and robots, both knee variants), `build.js` (runs them)
+- `cad/robot/` – whole-robot assemblies (`robot.sc`, `robot_linkage.sc`), the motion rig (`motion_rig.sc`), renders and bills of materials
+- `cad/scripts/` – generators: `dims.js` (all dimensions), `parts.js` (the parts), `assemblies.js` (legs and robots, both knee variants), `rig.js` (motion rig), `build.js` (runs them)
 - `cad/actuators/` – older RobStride 01 reference model (the assemblies use `cad/parts/robstride02.sc`)
 - `docs/` – design notes: actuator comparison and battery sizing
 - `.claude/skills/cad-modelling/` – the modelling conventions the generators follow
@@ -62,6 +62,7 @@ The models are generated from scripts. Every feature comes from a fully constrai
 ```
 node cad/scripts/build.js all                          # every part, then both legs and both robots
 node cad/scripts/build.js parts shank                  # one part
+node cad/scripts/build.js rig                          # motion rig: simplified legs you can drag in SolidCraft
 node cad/scripts/build.js symmetry                     # check that parts used on both sides equal their mirror image
 node cad/scripts/build.js check robot                  # clash check of the saved robot (add --app for renders)
 node cad/scripts/build.js pose HipAbduction -45 45     # clash check with all four abduction joints driven
@@ -69,6 +70,8 @@ node cad/scripts/build.js pose robot_linkage Knee -45 -140   # the same on the l
 ```
 
 Without `--app` the scripts use `solidcraft-cli`. With `--app` they run in the open SolidCraft desktop app through its local control channel, which needs "Let AI agents connect" turned on in the app. Use `--app` when Windows will not start the command-line tool, for example when Smart App Control blocks unsigned programs.
+
+The motion rig (`cad/robot/motion_rig.sc`) has simplified legs with the real link lengths, joint positions and joint limits, laid out so that SolidCraft can drag them with the mouse. Turn contact off (Disable Contact) before dragging: live collision checking is too slow on this model. The link lengths (`lt`, `ls`, `lk_a`, `lk_b`, `lk_c`) can be changed in the app's parameter table.
 
 Production files (cut files, print files, STEP) are not stored in the repository. They will be exported once the design is complete.
 
