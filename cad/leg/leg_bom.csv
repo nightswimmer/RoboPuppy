@@ -9,6 +9,6 @@
 "8","RP-107","Knee axle, dia 8 steel, ends tapped","","1","KneeAxle","Default",""
 "9","RP-108","Hip spacer between the thigh plates, printed","","1","HipSpacer","Default",""
 "10","RP-201","Bulkhead, 3 mm aluminium, laser-cut","","1","Bulkhead","Default",""
-"11","RS01","RobStride 01 actuator (envelope with mounting patterns)","","3","RobStride01","Default",""
+"11","RS02","RobStride 02 actuator, CAN 2.0 (envelope with mounting patterns and plug keep-outs)","","3","RobStride02","Default",""
 "12","SCR-M5X45","Idler bolt M5 x 45 (shank only)","","1","IdlerBolt","Default",""
 "13","SO-M3X35","Standoff M3 x 35, female-female","","3","Standoff","Default",""

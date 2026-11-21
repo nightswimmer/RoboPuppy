@@ -2,15 +2,20 @@
 // Each part file receives the ones it uses as named parameters, so mating features
 // (bolt circles, thicknesses, axis positions) are never typed twice.
 module.exports = {
-  // ---- RobStride 01 actuator (purchased) ----
+  // ---- RobStride 02 actuator (purchased), from the official STEP file (RS02-20261030.stp) ----
+  // Angles in the actuator frame, from the plug (+X): pins 0/120/240, M4 30+60k, front M3 0+40k,
+  // rear M3 40/80/120/240/280/320, rear heads 0/160/200, sockets 0 and 180.
   rs_body_d: 78.5, rs_body_l: 28,        // housing
-  rs_cover_d: 63, rs_cover_l: 8.5,       // rear cover
+  rs_cover_d: 65, rs_cover_l: 13.5,      // rear cover
   rs_pilot_d: 43, rs_pilot_h: 3.5,       // fixed pilot ring on the front face
   rs_flange_d: 30, rs_flange_h: 4,       // output flange (0.5 proud of the pilot)
   rs_m3_bcd: 73,                         // M3 circles, front (9x) and rear (6x)
-  rs_flange_bcd: 24,                     // 6x M4 + 3x dia 4 pins on the output flange
-  rs_head_d: 5.5, rs_head_h: 3,          // three proud screw heads on the rear annulus
-  rs_plug_w: 14, rs_plug_r0: 28, rs_plug_r1: 38,   // plug stub on the rear cover (size assumed)
+  rs_flange_bcd: 24, rs_m4_depth: 7,     // 6x M4 (7 deep minimum) + 3x dia 4 pins on the output flange
+  rs_head_d: 5.6, rs_head_h: 2.35,       // three proud screw heads on the rear annulus
+  // XT30PB(2+2)-M sockets in the cover rim, facing outward (15.5 wide, 5.2 axial, 2.8-8.0 behind the rear annulus,
+  // face at r 35.2). Modelled as the keep-out of the mated XT30(2+2)-F plug: plug size and cable room are estimates.
+  rs_plug_w: 16, rs_plug_h: 6, rs_plug_z: 5.4,      // width, axial height, centre behind the rear annulus
+  rs_plug_r0: 30, rs_plug_r1: 50,                   // radial extent: from inside the cover to 15 mm past the socket face
 
   // ---- serial bus servo, Feetech STS size (purchased; dimensions not yet verified) ----
   sv_l: 45, sv_w: 24.7, sv_h: 35, sv_off: 10,      // sv_h along the shaft; shaft sv_off from one end
@@ -35,11 +40,11 @@ module.exports = {
   idl_z: 110, idl_x0: 34, idl_len: 11, idl_w: 5.2, idl_x: 31,   // tensioner slot; idl_x = nominal roller position
   axle_d: 8, pilot_clear_d: 43.2,
   // hip spacer: closes the gap between the plates around the hip end, clamped by the knee actuator screws
-  sp_bore_d: 56,         // clears the belt on the hip pulley (back at r ~20) and the heads of the three lower actuator screws
+  sp_bore_d: 56,         // clears the belt on the hip pulley (back at r ~20) and the heads of the two lowest actuator screws
   sp_end: 6,             // legs run this far past the upper standoff holes
   // hip carrier
-  cup_od: 88, cup_rear: 8, cup_len: 28, bore_d: 79.2, opening_d: 65,
-  cover_relief: 1,       // the rear opening starts this far behind the cup, so the actuator cover (0.5 proud) clears the block
+  cup_od: 88, cup_rear: 8, cup_len: 28, bore_d: 79.2, opening_d: 67,
+  cover_relief: 1,       // the rear opening runs this far past the end of the actuator cover (5.5 proud of the cup), through the block
   plug_slot_w: 18, plug_slot_h: 96,
   flange_x: 46,          // abduction flange face, from the hip pitch axis
   block_t: 18, block_h: 68, block_back: 17, block_front: 40,
@@ -73,7 +78,10 @@ module.exports = {
   t_frame: 3, t_deck: 2, t_pan: 3,
   x_bulk: 160,           // bulkhead inner face = abduction actuator front face (hip_x - 50)
   x_mid: 129,            // mid frame inner face (hip_x - 78 - t_frame)
-  mid_slot: 18, mid_slot_z0: 28, mid_head_d: 6.5,
+  mid_slot: 18, mid_slot_z0: 28, mid_head_d: 6.5,   // plug slot above each actuator axis (open to the top edge)
+  mid_notch: 9,          // plug notch below each actuator axis: to r 37, just past the socket face (r 35.2)
+  mid_tab_w: 30, mid_tab: 5,   // tab below each actuator, reaching mid_tab below the frame lobe: a web under the notch and heads
+  plug_clr: 1,           // clearance round the abduction plugs in the deck slots and belly pan notches
   deck_spine_l: 612, deck_spine_w: 60, wag_hole_d: 12,
   bat_l: 200, bat_w: 110, bat_h: 72, bat_z0: -34,
   // spine ribs: bent 3 mm aluminium L under each end of the deck spine, from the mid frame through a slot in the bulkhead

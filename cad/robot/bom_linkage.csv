@@ -20,7 +20,7 @@
 "19","RP-304","Tail lift servo bracket, printed","","1","TailBracket","Default",""
 "20","RP-305","Tail yoke, printed","","1","TailYoke","Default",""
 "21","RP-306","Tail rod, printed TPU","","1","Tail","Default",""
-"22","RS01","RobStride 01 actuator (envelope with mounting patterns)","","12","RobStride01","Default",""
+"22","RS02","RobStride 02 actuator, CAN 2.0 (envelope with mounting patterns and plug keep-outs)","","12","RobStride02","Default",""
 "23","SA5-TK","Rod end M5 male, 5 mm bore (SA5 T/K size)","","8","RodEnd","Default",""
 "24","SO-M3X20","Standoff M3 x 20, female-female","","8","Standoff20","Default",""
 "25","STS-HORN","Servo horn disc","","2","Horn","Default",""

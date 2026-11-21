@@ -9,6 +9,6 @@
 "8","RP-116","Shank with knee lever, linkage knee, printed","","1","ShankLk","Default",""
 "9","RP-117","Knee axle, linkage knee, dia 8 steel, ends tapped","","1","KneeAxleLk","Default",""
 "10","RP-201","Bulkhead, 3 mm aluminium, laser-cut","","1","Bulkhead","Default",""
-"11","RS01","RobStride 01 actuator (envelope with mounting patterns)","","3","RobStride01","Default",""
+"11","RS02","RobStride 02 actuator, CAN 2.0 (envelope with mounting patterns and plug keep-outs)","","3","RobStride02","Default",""
 "12","SA5-TK","Rod end M5 male, 5 mm bore (SA5 T/K size)","","2","RodEnd","Default",""
 "13","SO-M3X20","Standoff M3 x 20, female-female","","2","Standoff20","Default",""

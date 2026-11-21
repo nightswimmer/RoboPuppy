@@ -80,12 +80,12 @@ const PLATE = (y) => basis([1, 0, 0], [0, 0, 1], [0, -1, 0], [0, y, 0]);        
 // the two upper standoff positions (so_z1) are taken by the hip spacer's through-bolts
 const STANDOFFS = [[-P.standoff_x, -P.so_z2], [-P.standoff_x, -P.so_z3], [P.standoff_x, -P.so_z4]];
 
-const HIP = [[parts.hip_carrier, I()], [parts.robstride01, MOTOR_HIP]];
+const HIP = [[parts.hip_carrier, I()], [parts.robstride02, MOTOR_HIP]];
 const THIGH = [
   [parts.thigh_inner_plate, PLATE(Y_CAV0)],
   [parts.thigh_outer_plate, PLATE(Y_K)],
   [parts.hip_spacer, PLATE(Y_OUT)],
-  [parts.robstride01, MOTOR_KNEE],
+  [parts.robstride02, MOTOR_KNEE],
   [parts.hip_pulley, AX_Y([0, Y_BELT0, 0])],
   ...STANDOFFS.map(([x, z]) => [parts.standoff_m3x35, AX_Y([x, Y_CAV0, z])]),
   [parts.knee_axle, AX_Y([0, P.y_in, -P.lt])],
@@ -109,7 +109,7 @@ const THIGH_LK = [
   [parts.thigh_inner_plate_lk, PLATE(Y_CAV0)],
   [parts.thigh_outer_plate_lk, PLATE(Y_K_LK)],
   [parts.hip_spacer_lk, PLATE(Y_OUT_LK)],
-  [parts.robstride01, MOTOR_KNEE_LK],
+  [parts.robstride02, MOTOR_KNEE_LK],
   ...[[P.lk_so_x1, -P.lk_so_z1], [P.lk_so_x2, -P.lk_so_z2]].map(([x, z]) => [parts.standoff_m3x20, AX_Y([x, Y_CAV0, z])]),
   [parts.knee_axle_lk, AX_Y([0, P.y_in, -P.lt])],
 ];
@@ -172,7 +172,7 @@ function legAsm(v) {
   const hip = tr(P.hip_x, P.abd_y, 0);
   const torso = asm.comp("Torso");
   asm.place(parts.bulkhead, "Torso", basis([0, 1, 0], [0, 0, 1], [1, 0, 0], [P.x_bulk, 0, 0]));
-  asm.place(parts.robstride01, "Torso", mul(hip, MOTOR_ABD));
+  asm.place(parts.robstride02, "Torso", mul(hip, MOTOR_ABD));
   const occ = { hip: buildModule(asm, "Hip_A", HIP), thigh: buildModule(asm, "Thigh_L", v.thigh), lower: buildModule(asm, "LowerLeg", v.lower) };
   if (v.linkage) Object.assign(occ, { crank: buildModule(asm, "KneeCrank_L", v.linkage.crank), rod: buildModule(asm, "KneeRod_L", v.linkage.rod) });
   for (const o of Object.values(occ)) asm.move(o, hip);
@@ -216,10 +216,10 @@ function robotAsm(v) {
   asm.place(parts.servo_sts, "Torso", mul(tr(-P.tail_wag_x, 0, P.torso_top), rz(180)));
   // abduction actuators: front-left as designed, the others are its mirror images
   const abdFL = mul(tr(P.hip_x, P.abd_y, 0), MOTOR_ABD);
-  asm.place(parts.robstride01, "Torso", abdFL);
-  asm.place(parts.robstride01, "Torso", mirrored(MY, abdFL, parts.robstride01));
-  asm.place(parts.robstride01, "Torso", mirrored(MX, abdFL, parts.robstride01));
-  asm.place(parts.robstride01, "Torso", mul(rz(180), abdFL));
+  asm.place(parts.robstride02, "Torso", abdFL);
+  asm.place(parts.robstride02, "Torso", mirrored(MY, abdFL, parts.robstride02));
+  asm.place(parts.robstride02, "Torso", mirrored(MX, abdFL, parts.robstride02));
+  asm.place(parts.robstride02, "Torso", mul(rz(180), abdFL));
 
   // neck and head
   const neck = asm.comp("NeckAsm");

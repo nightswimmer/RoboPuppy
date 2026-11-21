@@ -146,12 +146,28 @@ VIEWS.leg_linkage = VIEWS.leg;
 //   node cad/scripts/build.js pose HipAbduction -45 45 --app
 //   node cad/scripts/build.js pose robot_linkage Knee -45 -140 --app    (another saved robot)
 async function pose(key, prefix, angles) {
-  if (!APP) { console.log("pose runs through the app: add --app"); return false; }
+  const joints = ["FL", "FR", "RL", "RR"].map((l) => `${prefix}_${l}`);
+  if (!APP) {
+    // CLI: one script on the saved file (not saved back): drive, check, next angle
+    const commands = [];
+    for (const a of angles) {
+      for (const joint of joints) commands.push({ command: "joint.drive", params: { joint, value: Number(a), quiet: true } });
+      commands.push({ command: "inspect.interference", params: { budget_s: 900 } });
+    }
+    const results = await run(ASSEMBLIES[key][0], `${key}_pose_${prefix}`, { commands }, null, path.join("cad", ...ASSEMBLIES[key]));
+    if (!results) return false;
+    const checks = commands.map((c, i) => [c, results[i]]).filter(([c]) => c.command === "inspect.interference");
+    checks.forEach(([, r], k) => {
+      const list = (r.result || r).interferences || [];
+      console.log(`${prefix} ${angles[k]} deg: ${list.length} overlapping pairs`);
+      for (const f of list) console.log(`  ${f.a}  x  ${f.b}: ${(+f.volume_mm3 || 0).toFixed(1)} mm3`);
+    });
+    return true;
+  }
   app = app || (await require("./lib/control").Control.open());
   await app.execute("doc.open", { path: path.join(ROOT, "cad", ...ASSEMBLIES[key]) });
   const tab = (await app.call("ui.documents", {})).active;
   try {
-    const joints = ["FL", "FR", "RL", "RR"].map((l) => `${prefix}_${l}`);
     for (const a of angles) {
       const commands = joints.map((joint) => ({ command: "joint.drive", params: { joint, value: Number(a), quiet: true } }));
       commands.push({ command: "inspect.interference", params: { budget_s: 900 } });
@@ -168,12 +184,31 @@ async function pose(key, prefix, angles) {
 }
 
 // Clash check (and renders) of a saved assembly: node cad/scripts/build.js check robot|leg --app
+const reportClashes = (key, r) => {
+  const list = r.interferences || [];
+  console.log(`${key}: ${r.checked ?? "?"} bodies checked, ${list.length} overlapping pairs, ${(r.unchecked || []).length} unchecked`);
+  for (const f of list) {
+    const where = (p) => (p && p.path ? p.path.join("/") : "");
+    console.log(`  ${f.a} [${where(f.a_part)}]  x  ${f.b} [${where(f.b_part)}]: ${(+f.volume_mm3 || +f.volume || 0).toFixed(1)} mm3`);
+  }
+  for (const u of r.unchecked || []) console.log(`  unchecked ${u.a} x ${u.b}: ${u.reason}`);
+};
+
 async function check(key) {
-  if (!APP) { console.log("check runs through the app: add --app"); return false; }
-  app = app || (await require("./lib/control").Control.open());
   if (!ASSEMBLIES[key]) { console.log("unknown assembly " + key); return false; }
   const dir = path.join(ROOT, "cad", ASSEMBLIES[key][0], "build");
   fs.mkdirSync(dir, { recursive: true });
+  if (!APP) {
+    // CLI: clash check only (renders need the app)
+    const script = { commands: [{ command: "inspect.interference", params: { budget_s: 900 } }] };
+    const results = await run(ASSEMBLIES[key][0], `${key}_check`, script, null, path.join("cad", ...ASSEMBLIES[key]));
+    if (!results) return false;
+    const r = results[0].result || results[0];
+    fs.writeFileSync(path.join(dir, `${key}_interference.json`), JSON.stringify(r, null, 1));
+    reportClashes(key, r);
+    return true;
+  }
+  app = app || (await require("./lib/control").Control.open());
   await app.execute("doc.open", { path: path.join(ROOT, "cad", ...ASSEMBLIES[key]) });
   const tab = (await app.call("ui.documents", {})).active;
   try {
@@ -181,13 +216,7 @@ async function check(key) {
     const batch = await app.call("engine.batch", { commands: [{ command: "inspect.interference", params: { budget_s: 900 } }], rollback: false });
     const r = batch.results[0];
     fs.writeFileSync(path.join(dir, `${key}_interference.json`), JSON.stringify(r, null, 1));
-    const list = r.interferences || [];
-    console.log(`${key}: ${r.checked ?? "?"} bodies checked, ${list.length} overlapping pairs, ${(r.unchecked || []).length} unchecked`);
-    for (const f of list) {
-      const where = (p) => (p && p.path ? p.path.join("/") : "");
-      console.log(`  ${f.a} [${where(f.a_part)}]  x  ${f.b} [${where(f.b_part)}]: ${(+f.volume_mm3 || +f.volume || 0).toFixed(1)} mm3`);
-    }
-    for (const u of r.unchecked || []) console.log(`  unchecked ${u.a} x ${u.b}: ${u.reason}`);
+    reportClashes(key, r);
     for (const [name, v] of Object.entries(VIEWS[key] || {})) {
       await app.execute("view.apply", v);
       const file = path.join(dir, `${key}_render_${name}.png`);

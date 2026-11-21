@@ -9,6 +9,17 @@ const defs = [];
 const def = (key, info, build) => defs.push({ key, info, build });
 const S = Math.SQRT1_2;
 
+// Opening for the plugs of the front-left and rear-left abduction actuators, in the robot frame's XY plane: the
+// plug keep-out plus plug_clr all round, so a plug passes through to its socket. The right side is a feature mirror.
+const abdPlugCuts = (s) => {
+  const r = s.rect("x_bulk - rs_body_l - rs_plug_z - rs_plug_h/2 - plug_clr", "abd_y - rs_plug_w/2 - plug_clr",
+    "x_bulk - rs_body_l - rs_plug_z + rs_plug_h/2 + plug_clr", "abd_y + rs_plug_w/2 + plug_clr",
+    "rs_plug_h + 2*plug_clr", "rs_plug_w + 2*plug_clr");
+  s.dist(r.left, "x_bulk - rs_body_l - rs_plug_z - rs_plug_h/2 - plug_clr");
+  s.dist(r.bottom, "abd_y - rs_plug_w/2 - plug_clr");
+  s.mirror([r.bottom, r.right, r.top, r.left], "y");
+};
+
 // Spine ribs: root on the mid frame's outer face; the front rib runs to the tip of the deck spine, the rear
 // rib to just short of the tail wag servo. Flange screw positions are measured from the root.
 const RIB_ROOT_X = "(x_mid + t_frame)";
@@ -19,8 +30,11 @@ const RIB_SCREWS_X = ["rib_hx0", "rib_hx0 + rib_pitch", "rib_hx0 + 2*rib_pitch",
 // ============================ purchased ============================
 
 // Frame: axis Z, origin on the housing front face, output toward +Z, plug toward +X.
-def("robstride01", { body: "RobStride01", part_number: "RS01", bom_type: "purchased", sym: { axis: "y" },
-  description: "RobStride 01 actuator (envelope with mounting patterns)" }, (p) => {
+// The STEP file has two identical sockets, at +X (by the single rear screw head) and at -X (between the paired
+// heads); either can be the plug. Symmetric about its XZ plane. Not modelled: the three extra dia 3 holes on the
+// front M3 circle (at 100/220/340 deg; they would break the symmetry and nothing uses them).
+def("robstride02", { body: "RobStride02", part_number: "RS02", bom_type: "purchased", sym: { axis: "y" },
+  description: "RobStride 02 actuator, CAN 2.0 (envelope with mounting patterns and plug keep-outs)" }, (p) => {
   p.sketch("Body_Sketch", "XY", "-rs_body_l", (s) => s.circle(0, 0, "rs_body_d"));
   p.extrude("Body", "rs_body_l", { op: "new" });
   p.sketch("Cover_Sketch", "XY", "-rs_body_l - rs_cover_l", (s) => s.circle(0, 0, "rs_cover_d"));
@@ -29,28 +43,31 @@ def("robstride01", { body: "RobStride01", part_number: "RS01", bom_type: "purcha
   p.extrude("Pilot", "rs_pilot_h");
   p.sketch("Flange_Sketch", "XY", 0, (s) => s.circle(0, 0, "rs_flange_d"));
   p.extrude("Flange", "rs_flange_h");
-  p.sketch("Plug_Sketch", "XY", "-rs_body_l - rs_cover_l", (s) => {
+  // the two sockets with their mated plugs, radial, at +X and -X
+  p.sketch("Plugs_Sketch", "XY", "-rs_body_l - rs_plug_z - rs_plug_h/2", (s) => {
     const r = s.rectX("rs_plug_r0", "rs_plug_r1", "rs_plug_r1 - rs_plug_r0", "rs_plug_w");
     s.dist(r.left, "rs_plug_r0");
+    s.mirror([r.bottom, r.right, r.top, r.left], "y");
   });
-  p.extrude("Plug", "rs_cover_l");
-  // 9x M3 on the front face, 20 deg either side of the plug direction and every 40 deg
-  p.sketch("FrontM3_Sketch", "XY", 0, (s) => s.pattern([s.pointOn(s.polar("origin", "rs_m3_bcd/2", 20).end)], "origin", 9));
+  p.extrude("Plugs", "rs_plug_h");
+  // 9x M3 on the front face, every 40 deg from the plug direction
+  p.sketch("FrontM3_Sketch", "XY", 0, (s) => s.pattern([s.point("rs_m3_bcd/2", 0)], "origin", 9));
   p.hole("FrontM3", "FrontM3_Sketch", { thread: "M3", depth: 8 });
-  // 6x M3 on the rear annulus: a pair 20 deg either side of the plug, three times
+  // 6x M3 on the rear annulus: the nine 40 deg positions less the three taken by screw heads
   p.sketch("RearM3_Sketch", "XY", "-rs_body_l", (s) => {
-    const a = s.pointOn(s.polar("origin", "rs_m3_bcd/2", 20).end);
-    const b = s.pointOn(s.polar("origin", "rs_m3_bcd/2", 100).end);
-    s.pattern([a, b], "origin", 3);
+    const pts = [40, 80, 120].map((a) => s.pointOn(s.polar("origin", "rs_m3_bcd/2", a).end));
+    s.mirror(pts, "x");
   });
   p.hole("RearM3", "RearM3_Sketch", { thread: "M3", depth: 8 });
-  // three screw heads standing proud of the rear annulus, between the pairs
-  p.sketch("RearHeads_Sketch", "XY", "-rs_body_l", (s) =>
-    s.pattern([s.circleOn(s.polar("origin", "rs_m3_bcd/2", 60).end, "rs_head_d")], "origin", 3));
+  // three screw heads standing proud of the rear annulus: one in line with the plug, a pair opposite it
+  p.sketch("RearHeads_Sketch", "XY", "-rs_body_l", (s) => {
+    s.circle("rs_m3_bcd/2", 0, "rs_head_d");
+    s.mirror([s.circleOn(s.polar("origin", "rs_m3_bcd/2", 160).end, "rs_head_d")], "x");
+  });
   p.extrude("RearHeads", "rs_head_h", { dir: "negative" });
   // output flange: 6x M4 and 3x dia 4 pins on one circle (a pin in line with the plug)
   p.sketch("FlangeM4_Sketch", "XY", "rs_flange_h", (s) => s.pattern([s.pointOn(s.polar("origin", "rs_flange_bcd/2", 30).end)], "origin", 6));
-  p.hole("FlangeM4", "FlangeM4_Sketch", { thread: "M4", depth: 9 });
+  p.hole("FlangeM4", "FlangeM4_Sketch", { thread: "M4", depth: "rs_m4_depth" });
   p.sketch("FlangePin_Sketch", "XY", "rs_flange_h", (s) => s.pattern([s.point("rs_flange_bcd/2", 0)], "origin", 3));
   p.hole("FlangePins", "FlangePin_Sketch", { diameter: 4, depth: 5 });
 });
@@ -110,21 +127,19 @@ def("hip_carrier", { body: "HipCarrier", part_number: "RP-101", sym: { axis: "z"
   p.extrude("Block", "block_back + block_front");
   p.sketch("Bore_Sketch", "XZ", "y_h", (s) => s.circle(0, 0, "bore_d"));
   p.extrude("Bore", 0, { op: "cut", through: true });
-  p.sketch("Opening_Sketch", "XZ", "y_h - cup_rear - cover_relief", (s) => s.circle(0, 0, "opening_d"));
-  p.extrude("RearOpening", "cup_rear + cover_relief", { op: "cut" });
-  // plug slot through the rear wall, top and bottom, so the actuator plug points up whichever way up the carrier is
+  // plug slot through the rear wall, top and bottom: the actuator has a socket at each end of one diameter
   p.sketch("PlugSlot_Sketch", "XZ", "y_h - cup_rear", (s) => s.rectC("plug_slot_w", "plug_slot_h"));
   p.extrude("PlugSlot", "cup_rear", { op: "cut" });
-  // actuator rear M3 pattern, repeated every 60 deg (the actuator uses every other pair)
+  // Actuator rear M3 holes and screw heads, for both hands: on the other hand's hips the carrier is turned over and
+  // the actuator sits half a turn about its axis from this one, so each pattern is its own half-turn copy as well.
+  // Carrier angle = 90 - actuator angle: holes 10/50/130/170/210/330 and heads 90/250/290, plus their half-turn copies.
   p.sketch("RearM3_Sketch", "XZ", "y_h - cup_rear", (s) => {
-    const a = s.pointOn(s.polar("origin", "rs_m3_bcd/2", 10).end);
-    const b = s.pointOn(s.polar("origin", "rs_m3_bcd/2", 50).end);
-    s.pattern([a, b], "origin", 6);
+    const pts = [10, 30, 50, 130, 150, 170].map((a) => s.pointOn(s.polar("origin", "rs_m3_bcd/2", a).end));
+    s.pattern(pts, "origin", 2);
   });
   p.hole("RearM3", "RearM3_Sketch", { clearance: "M3", depth: "cup_rear" });
-  // pockets for the actuator's proud rear screw heads
   p.sketch("HeadPocket_Sketch", "XZ", "y_h", (s) =>
-    s.pattern([s.circleOn(s.polar("origin", "rs_m3_bcd/2", 30).end, "head_pocket_d")], "origin", 6));
+    s.pattern([70, 90, 110].map((a) => s.circleOn(s.polar("origin", "rs_m3_bcd/2", a).end, "head_pocket_d")), "origin", 2));
   p.extrude("HeadPockets", "head_pocket_depth", { op: "cut", dir: "negative" });
   // abduction flange: 6x M4 with counterbores from the inside, dowel pin holes between them
   p.sketch("FlangeM4_Sketch", "YZ", "-flange_x", (s) => s.pattern([s.point("rs_flange_bcd/2", 0)], "origin", 6));
@@ -133,12 +148,17 @@ def("hip_carrier", { body: "HipCarrier", part_number: "RP-101", sym: { axis: "z"
   p.hole("FlangePins", "FlangePin_Sketch", { diameter: 4, depth: "block_t" });
   p.sketch("Counterbore_Sketch", "YZ", "-flange_x + cb_floor", (s) => s.pattern([s.circle("rs_flange_bcd/2", 0, "cb_d")], "origin", 6));
   p.extrude("FlangeCounterbores", "block_t - cb_floor", { op: "cut" });
+  // The actuator's rear cover stands 5.5 out of the cup's rear face; the opening runs past its end, notching the
+  // block. Cut last: before the counterbores, it leaves a shell the kernel cannot validate.
+  p.sketch("Opening_Sketch", "XZ", "y_h - rs_cover_l - cover_relief", (s) => s.circle(0, 0, "opening_d"));
+  p.extrude("RearOpening", "rs_cover_l + cover_relief", { op: "cut" });
 });
 
-// Knee actuator front-face M3 pattern about the hip axis, in the thigh plate frame. One source for both plates
-// and the hip spacer: the six upper screws run through inner plate, spacer and outer plate into the actuator;
-// the three lower ones hold only the outer plate, and the inner plate's holes there give a hex key access.
-const kneeM3 = (s) => s.pattern([s.pointOn(s.polar("origin", "rs_m3_bcd/2", 70).end)], "origin", 9);
+// Knee actuator front-face M3 pattern about the hip axis, in the thigh plate frame (one hole straight up, in line
+// with the plug). One source for both plates and the hip spacer: the seven screws where the spacer has material
+// run through inner plate, spacer and outer plate into the actuator; the two lowest hold only the outer plate,
+// and the inner plate's holes there give a hex key access.
+const kneeM3 = (s) => s.pattern([s.point(0, "rs_m3_bcd/2")], "origin", 9);
 
 // Frame: plate in the XY plane, X forward, Y up, origin on the hip axis, knee at (0, -lt). Thickness along +Z.
 // Flat with through features only, so it can be turned over: the same plate serves both sides.
@@ -280,7 +300,7 @@ def("bulkhead", { body: "Bulkhead", part_number: "RP-201", sym: { axis: "z", abo
   p.sketch("Pilot_Sketch", "XY", 0, (s) => s.circle("abd_y", 0, "pilot_clear_d"));
   p.extrude("PilotLeft", 0, { op: "cut", through: true });
   p.sketch("M3_Sketch", "XY", 0, (s) => {
-    const e = s.polar(["abd_y", 0], "rs_m3_bcd/2", 70);
+    const e = s.polar(["abd_y", 0], "rs_m3_bcd/2", 90);    // one hole straight up, in line with the plug
     s.pattern([s.pointOn(e.end)], e.start, 9);
   });
   p.hole("M3Left", "M3_Sketch", { clearance: "M3" });
@@ -307,28 +327,42 @@ def("mid_frame", { body: "MidFrame", part_number: "RP-202", sym: { axis: "z", ab
   description: "Mid frame, 3 mm aluminium, laser-cut" }, (p) => {
   p.sketch("Outline_Sketch", "XY", 0, (s) => torsoSection(s, "lobe_r", "torso_half_w", "torso_top"));
   p.extrude("Plate", "t_frame", { op: "new" });
+  // tab below each actuator: keeps a web under the plug notch and the paired screw heads
+  p.sketch("Tab_Sketch", "XY", 0, (s) => {
+    const r = s.rect("abd_y - mid_tab_w/2", neg("lobe_r + mid_tab"), "abd_y + mid_tab_w/2", neg("mid_slot_z0"),
+      "mid_tab_w", "lobe_r + mid_tab - mid_slot_z0");
+    s.dist(r.left, "abd_y - mid_tab_w/2");
+    s.dist(r.top, "mid_slot_z0");
+  });
+  p.extrude("TabLeft", "t_frame");
   p.sketch("Cover_Sketch", "XY", 0, (s) => s.circle("abd_y", 0, "opening_d"));
   p.extrude("CoverLeft", 0, { op: "cut", through: true });
+  // The actuator's two sockets point straight up and straight down. Above: a slot open to the top edge. Below: a
+  // closed notch that clears only the socket (a slot through the bottom edge would cut the frame in two).
   p.sketch("PlugSlot_Sketch", "XY", 0, (s) => {
     const r = s.rect("abd_y - mid_slot/2", "mid_slot_z0", "abd_y + mid_slot/2", "mid_slot_z0 + mid_slot", "mid_slot", "mid_slot");
     s.dist(r.left, "abd_y - mid_slot/2");
     s.dist(r.bottom, "mid_slot_z0");
+    const n = s.rect("abd_y - mid_slot/2", neg("mid_slot_z0 + mid_notch"), "abd_y + mid_slot/2", neg("mid_slot_z0"), "mid_slot", "mid_notch");
+    s.dist(n.left, "abd_y - mid_slot/2");
+    s.dist(n.top, "mid_slot_z0");
   });
   p.extrude("PlugSlotLeft", 0, { op: "cut", through: true });
-  // actuator rear face: 6x M3 and clearance for its three proud screw heads
+  // Actuator rear face: 6x M3 and clearance for its three proud screw heads, symmetric about the vertical through
+  // the axis. Frame angle = 90 + actuator angle: holes 10/50/130/170/210/330, heads 90/250/290 (the top one is in the slot).
   p.sketch("M3_Sketch", "XY", 0, (s) => {
-    const e = s.polar(["abd_y", 0], "rs_m3_bcd/2", 70);
-    const a = s.pointOn(e.end);
-    const b = s.pointOn(s.polar(e.start, "rs_m3_bcd/2", 110).end);
-    s.pattern([a, b], e.start, 3);
+    const v = s.polar(["abd_y", 0], "rs_m3_bcd/2", 90);
+    const pts = [10, 50, 330].map((a) => s.pointOn(s.polar(v.start, "rs_m3_bcd/2", a).end));
+    s.mirror(pts, v.start.id.split(".")[0]);
   });
   p.hole("M3Left", "M3_Sketch", { clearance: "M3" });
   p.sketch("Heads_Sketch", "XY", 0, (s) => {
-    const e = s.polar(["abd_y", 0], "rs_m3_bcd/2", 30);
-    s.pattern([s.circleOn(e.end, "mid_head_d")], e.start, 3);
+    const v = s.polar(["abd_y", 0], "rs_m3_bcd/2", 90);
+    s.circleOn(v.end, "mid_head_d");
+    s.mirror([s.circleOn(s.polar(v.start, "rs_m3_bcd/2", 250).end, "mid_head_d")], v.start.id.split(".")[0]);
   });
   p.extrude("HeadsLeft", 0, { op: "cut", through: true });
-  p.mirrorFeature("RightSide", ["CoverLeft", "PlugSlotLeft", "M3Left", "HeadsLeft"], "YZ");
+  p.mirrorFeature("RightSide", ["TabLeft", "CoverLeft", "PlugSlotLeft", "M3Left", "HeadsLeft"], "YZ");
 });
 
 // Frame: the robot frame (X forward, Y left, Z up, origin at the torso centre on the abduction axes' height).
@@ -337,6 +371,10 @@ def("belly_pan", { body: "BellyPan", part_number: "RP-203", description: "Belly 
   p.extrude("Outer", "2*x_mid", { op: "new" });
   p.sketch("Inner_Sketch", "YZ", "-x_mid", (s) => torsoSection(s, "pan_lobe_r - t_pan", "torso_half_w - t_pan", "torso_top + 2"));
   p.extrude("Inner", 0, { op: "cut", through: true });
+  // notches in the ends of the pan floor for the abduction actuators' downward plugs
+  p.sketch("PlugNotches_Sketch", "XY", 0, abdPlugCuts);
+  p.extrude("PlugNotchesLeft", "pan_lobe_r + 1", { op: "cut", dir: "negative" });
+  p.mirrorFeature("PlugNotchesRight", ["PlugNotchesLeft"], "XZ");
 });
 
 // Frame: robot X and Y, underside at z = 0.
@@ -346,6 +384,10 @@ def("deck", { body: "Deck", part_number: "RP-204", description: "Deck with spine
     s.rectC("deck_spine_l", "deck_spine_w");
   });
   p.extrude("Plate", "t_deck", { op: "new" });
+  // slots over the abduction actuators' upward plugs
+  p.sketch("PlugSlots_Sketch", "XY", 0, abdPlugCuts);
+  p.extrude("PlugSlotsLeft", 0, { op: "cut", through: true });
+  p.mirrorFeature("PlugSlotsRight", ["PlugSlotsLeft"], "XZ");
   p.sketch("WagShaft_Sketch", "XY", "t_deck", (s) => s.point(neg("tail_wag_x"), 0));
   p.hole("WagShaftHole", "WagShaft_Sketch", { diameter: "wag_hole_d" });
   // spine rib flange screws: the front rib's flange is on the left, the rear rib's (turned half a turn) on the right
