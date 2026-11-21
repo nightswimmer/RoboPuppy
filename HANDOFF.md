@@ -1,35 +1,19 @@
 # Handoff – what's left to do
 
-## Next session: migrate the CAD to Onshape
-The owner decided to leave SolidCraft. The deciding requirement: **in the assembly, any part can be clicked and dragged with the mouse, and the legs move along their joints**, while the legs stay grouped (sub-assemblies, not a flat list). SolidCraft cannot do this (see PROJECT_INSTRUCTIONS.md, Tooling). Onshape drags a placed sub-assembly along its mates when any of its parts is grabbed. Confirm this early, on a small test assembly, before migrating everything.
+## Next: switch the model to the RobStride 02 and a 13S2P battery
+Decided by the owner on 2026-11-21. The reasoning and numbers are in `docs/robstride_comparison.md` and `docs/battery.md`. The model still has the RobStride 01 and the 10S battery keep-out.
 
-### Decide first, with the owner
-1. **How the model is built:**
-   - **Generated:** Node scripts calling the Onshape REST API, or FeatureScript Part Studios driven by variables. This keeps one dimension table and rebuildable parts, like now.
-   - **By hand in Onshape:** quicker to start, but loses the generator.
-   - Recommendation: keep `dims.js` as the single source and generate. Parts in one or more Part Studios driven by variables or configuration variables, then assemblies with mates.
-2. **Onshape plan:** documents on the free plan are public. Check that the owner is fine with that, or uses a paid or education plan.
-3. **API access (if generated):** the owner creates API keys in the Onshape developer portal. Keep the keys out of the repo (environment variables, or a git-ignored file), and add that file to `.gitignore` before the first run.
-4. **What happens to the SolidCraft files** (`cad/parts/*.sc`, the assemblies, `cad/scripts/`) once Onshape holds the model: keep them as an archive, or delete them.
-5. **Which knee variant to carry over:** belt, linkage, or both (both exist now; see below).
-
-### What has to carry over (it all lives in the current scripts)
-- **Dimensions:** `cad/scripts/dims.js`, every dimension, with comments on what drives what.
-- **Parts:** `cad/scripts/parts.js`, 38 parts, each with its sketches, constraints, hole groups, mirror plane (`sym`), part number and made/purchased type. Part frames are described in comments.
-- **Assemblies:** `cad/scripts/assemblies.js`.
-  - Leg modules: hip, thigh and lower leg, plus crank and rod for the linkage.
-  - Placements: the right-hand module is the same parts placed as mirror(T)·reflect(part's own plane), always a rigid move. The rear legs are the front modules turned or copied.
-  - Joints: 16 revolute joints with limits, and the standing pose (hip 35°, knee −70°).
-  - Linkage loop: crank–thigh and rod–crank revolute, rod–lever ball. In Onshape: revolute mates plus a ball mate, or mate connectors, which should close the loop.
-  - `cad/scripts/lib/linkage.js` holds the four-bar maths for placing the crank and rod at a given knee angle.
-- **Rules:** the `cad-modelling` skill. In particular: one file per part, same fabricated parts on both sides, fully constrained sketches, one hole feature per hole group, BOM from the assembly structure. Check how each rule maps to Onshape: Part Studios versus one-part-per-studio, derived parts, configurations, Onshape's Hole feature, and its BOM.
-- **Checks to rebuild in Onshape:** sketch constraint status, mirror symmetry of shared parts, clash check (Onshape has interference detection in assemblies), BOM counts (27 items per robot variant).
-
-### Approach
-1. Small test first: one leg (hip, thigh, lower leg modules as sub-assemblies) with three revolute mates. Confirm that mouse dragging works the way the owner wants.
-2. Then the purchased parts (RobStride 01, servos, rod end, standoffs), then the made parts, in the order of `parts.js`.
-3. Then the leg and the robot assemblies, the linkage loop, the BOM, and a clash check against the known clash list below.
-4. Update PROJECT_INSTRUCTIONS.md and README.md for the new tool.
+1. **RS02 part:** add `robstride02.sc` from the official drawing and STEP file (github.com/RobStride/Product_Information, `Product Literature/CAN2.0/RS02/RS02-20261030.stp`). Compared with the RS01:
+   - Same: Ø78.5 × 28 housing, 9× M3 on Ø73 at the front, Ø43 × 3.5 pilot with the flange 0.5 mm proud, and 6× M4 plus 3× Ø4 pins on Ø24.
+   - Different: the rear cover is Ø65 × 13.5 (RS01: Ø63 × 8.5), so the overall length is 45.5 mm (RS01: 40.5). The three proud rear screw heads sit on the same nine 40° positions, but two are adjacent and the third is opposite, not every 120°. The M4 thread depth in the flange is 7 mm minimum (RS01: 9). Three extra Ø3 holes on the front Ø73 circle can be ignored.
+   - Take the plug position and envelope from the STEP file. The RS01 plug stub is still a guess, too.
+   - Replace `robstride01` in every assembly (12 per robot, both variants), and update `dims.js`.
+2. **Hip carrier:** widen the rear opening (`opening_d` 65 → about 67). Pocket the RS02 head layout, or all nine 40° positions so the carrier still fits either way up. Check the plug slot. Recheck the rear M3 holes against the RS02 rear pattern.
+3. **Screws:** shorten the M4 screws into the output flanges to suit the 7 mm thread.
+4. **Clash checks**, both variants: the rear covers of the hip-pitch, knee and abduction actuators now stand 5 mm further out. Recheck the abduction limits and the width over the knee actuators.
+5. **Battery keep-out:** size it for the 13S2P pack (26 × 21700 cells plus BMS; see `docs/battery.md`), and fix its clash with the belly pan at the same time.
+6. **Mass and torque:** add about 1.3 kg for the battery and about 0.3 kg for the motors, then recheck the knee torque estimate against the RS02's 6 N·m rating.
+7. **Power:** the head and tail servo step-down converter needs a 60 V or higher input rating. Regen with a full pack (54.6 V) can exceed the RS02's 60 V limit: plan a braking resistor, or charge only to 4.1 V per cell.
 
 ## Linkage knee (added in the last session; open points)
 - **Lever pin fastener:** the M5 pin through the shank lever sits 0.5 mm from the thigh plates, so it needs flush heads or a threaded insert in the printed lever.
@@ -59,7 +43,7 @@ The owner decided to leave SolidCraft. The deciding requirement: **in the assemb
 - **Rear rib and wag servo:** the rib stops 1 mm short of the servo and does not grip it. Once the servo mount is designed, the rib could carry it.
 - **README images** (`cad/robot/robot_side.png`, `robot_iso.png`, `cad/leg/leg.png`) predate the spacer and ribs. Regenerate them. The named views in `build.js check` frame badly, so set explicit cameras or capture from the app by hand.
 
-## Modelling and tooling (SolidCraft items lapse once the migration is done)
+## Modelling and tooling
 - **SolidCraft bug worth reporting** (if the owner wants to): a click on a part inside a sub-assembly cannot drag the sub-assembly along its joints. `joint.reach` on the part answers "no joint places it: it is not connected to anything grounded", while the same move on the sub-assembly works.
 - **Smart App Control:** `solidcraft-cli.exe` and the `solidcraft` MCP connector are blocked by Windows because SolidCraft's Windows builds are unsigned. Use `build.js --app` with the desktop app open. Watch SolidCraft issue #8317 for signed builds.
 - **Skill:** the owner will move `.claude/skills/cad-modelling/` to the personal skills folder and may add a project-specific skill. The owner has more modelling issues to add to it.

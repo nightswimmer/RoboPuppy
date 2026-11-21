@@ -1,13 +1,13 @@
 # RoboPuppy
 
-A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts. The current model is in SolidCraft; the design is moving to Onshape.
+A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts, modelled in SolidCraft.
 
 ![Side view](cad/robot/robot_side.png)
 
 ## Status
 First detailed design pass. The whole robot is modelled as an articulated assembly: torso, four legs, neck, head and tail. Two knee drives are modelled side by side: a belt drive and a crank-and-pushrod linkage. Every part is its own file, linked into the assemblies, so the bill of materials comes straight from the model. Fasteners, servo mounts and some drive details are still missing, and nothing has been built yet.
 
-The CAD is being moved to Onshape, which can drag the jointed legs with the mouse while keeping them grouped. The SolidCraft model and its generator scripts stay in this repository until the migration is done.
+The leg actuators are changing from the RobStride 01 to the RobStride 02, and the battery from 10S to 13S2P. These are decided, but the model still shows the RobStride 01.
 
 ## Design targets
 - Torso about 60 cm long, with the rest scaled to a dog of that size
@@ -19,8 +19,10 @@ The CAD is being moved to Onshape, which can drag the jointed legs with the mous
 ## Actuators
 | Joints | Actuator |
 |---|---|
-| 12 leg joints | RobStride 01 quasi-direct-drive (17 N·m peak, 380 g, CAN, 36 V) |
+| 12 leg joints | RobStride 02 quasi-direct-drive (17 N·m peak, about 405 g, CAN, 48 V) |
 | Neck tilt, head pan, tail wag, tail lift | Feetech STS-family serial bus servos |
+
+Power comes from a 13S2P Li-ion pack: 26 × 21700 cells, 46.8 V nominal, 468 Wh, about 2.1 kg. That gives an estimated 2–3 hours of trotting. See [docs/robstride_comparison.md](docs/robstride_comparison.md) for the actuator comparison and [docs/battery.md](docs/battery.md) for the battery sizing.
 
 ## Design
 ![Robot](cad/robot/robot_iso.png)
@@ -52,6 +54,7 @@ The bills of materials are in [cad/robot/bom.csv](cad/robot/bom.csv) (belt knee:
 - `cad/robot/` – whole-robot assemblies (`robot.sc`, `robot_linkage.sc`), renders and bills of materials
 - `cad/scripts/` – generators: `dims.js` (all dimensions), `parts.js` (the parts), `assemblies.js` (legs and robots, both knee variants), `build.js` (runs them)
 - `cad/actuators/` – RobStride 01 reference model from the official drawing
+- `docs/` – design notes: actuator comparison and battery sizing
 - `.claude/skills/cad-modelling/` – the modelling conventions the generators follow
 
 The models are generated from scripts. Every feature comes from a fully constrained sketch, and all dimensions live in one table. To rebuild after changing a dimension (needs SolidCraft installed), run from the repository root:
