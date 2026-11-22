@@ -151,7 +151,8 @@ async function pose(key, prefix, angles) {
   const joints = ["FL", "FR", "RL", "RR"].map((l) => `${prefix}_${l}`);
   if (!APP) {
     // CLI: one script on the saved file (not saved back): drive, check, next angle
-    const commands = [];
+    // the rig is saved with live contact off, but it may have been switched on and saved in the app (it refuses big joint moves)
+    const commands = key === "rig" ? [{ command: "contact.enable_sets", params: { enabled: false } }] : [];
     for (const a of angles) {
       for (const joint of joints) commands.push({ command: "joint.drive", params: { joint, value: Number(a), quiet: true } });
       commands.push({ command: "inspect.interference", params: { budget_s: 900 } });

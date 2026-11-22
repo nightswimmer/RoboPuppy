@@ -1,18 +1,30 @@
 # Handoff – what's left to do
 
-## Next: joint ranges and leg proportions (motion rig)
-The owner is testing the legs in `cad/robot/motion_rig.sc` (contact off) and wants to tweak the joint ranges next.
+## Next: the new leg (motion rig)
+The new leg exists only in `cad/robot/motion_rig.sc` (`rig.js`): 200/200 mm, crescent thigh, shank of two curved aluminium plates, knee 60–159°, four-bar crank 22 / lever 28 at −12° / rod lt + 3 (see PROJECT_INSTRUCTIONS.md, Decisions). The owner may still tweak it by dragging the rig (saved with contact off).
 
-1. **Joint ranges:** the owner will say which ranges to change. Limits are plain numbers in `LIMITS` at the top of `cad/scripts/rig.js` (now abduction ±45°, hip pitch ±120°, knee −140 to −45°, as in `robot_linkage.sc`). Once decided, carry them into `assemblies.js` so `robot.sc` and `robot_linkage.sc` use the same limits, and record them in PROJECT_INSTRUCTIONS.md. Limits already known: abduction outward about 17° (hip-pitch plug and deck spine), inward 36° (same-side legs collide).
-2. **Leg length and knee ratio (undecided):** the owner is thinking of shorter legs and a higher knee ratio (the Go2 is about 213/213 mm). Claude suggested about 220/220 with about 1.75:1 standing (for example a shorter `lk_b`), tried in the rig first. Changing `lt` and `ls` in the full model affects the belt length, standoff positions, pushrod length and the clash checks. Remind the owner to push to GitHub before that change.
-3. **Rig contact default:** the generator turns the "Collisions" contact set on (end of `rig()` in `rig.js`), so a freshly built rig fails to drag until contact is disabled by hand. Ask the owner whether to build it with contact off. If live contact is wanted, the rig needs a simplified torso (outlines without holes), at least 2 mm clearance at every joint, and contact sets that only pair parts that set real limits (legs vs torso, legs vs legs, shank and rod vs thigh), each timed headless before rebuilding (aim under about 50 ms per drag step).
-4. **Rig maintenance:** the rig takes its dimensions from `dims.js`, but its leg bodies are its own simple shapes. If the real leg parts change shape (not just dimensions), update `rig.js` too.
+1. **Remaining joint ranges:** abduction (±45° in the rig) and hip pitch (±120°) are still to be set from the rig. Limits are plain numbers in `LIMITS` at the top of `rig.js`. Known: abduction outward about 17° (hip-pitch plug and deck spine), inward 36° (same-side legs collide).
+2. **Carry the new leg into the part files and both robots (big change: remind the owner to push to GitHub first).** What it involves:
+   - In `dims.js`, `lt` and `ls` become 200 (the new leg's own numbers are in `NL` in `rig.js`).
+   - New part files: crescent thigh plates, curved shank plates (one flat plate should serve both sides turned over; the rig has handed definitions only for convenience), shank spacers, axle tube, new crank and pushrod lengths.
+   - Retire the printed shank (RP-116) and the old tapered plates.
+   - Update `leg_linkage.sc`, `robot_linkage.sc`, the BOMs and the joint limits in `assemblies.js`.
+   - Decide what happens to the belt variant: its belt length and thigh are tied to 242.2 mm.
+   - Rerun the symmetry, clash and pose checks.
+   - The 2D checker used to place the standoffs (shapely, in the session scratchpad, not saved) can be rewritten if needed: thigh outline, swept rod and shank, free space.
+3. **Open points on the new leg:**
+   - **Plate ties:** the lowest thigh standoff is 145 mm below the hip, so in the lower 55 mm only the knee axle ties the two thigh plates. Check the stiffness, or add a tie in front of the knee where the shank does not pass.
+   - **Rod and lever forces:** at about 23 N·m knee peak and a 28 mm lever, the rod sees about 1 kN at trotting folds and more near the fold ends (transmission angle down to 18°). Check the M5 rod ends, the lever pin and the 3 mm plate bearing area round the pin (a sleeve or a thicker boss may be needed).
+   - **Flush fasteners:** the shank plates run 2 mm inside the thigh plates, so the shank spacer screws and the lever pin need countersunk or flush heads (not modelled).
+   - **Rod outside the thigh:** the longer lever makes the rod end and lever pin stick out of the knee round a little more than before (accepted by the owner, as on the Unitree legs). Check that it clears the ground and the other legs when lying down.
+   - **Torque margin:** the RS02 knee is now within its rating for trotting, but it has about 60% of the Go2's torque per kg. Options left for later: a 1.5:1 reduction before the crank, or RobStride 06 knees.
+4. **Rig maintenance:** the rig's torso comes from the real part files, but its legs are its own bodies. Keep `rig.js` and the part files in step once the new leg is carried over. If live contact is ever wanted, the rig needs a simplified torso, at least 2 mm clearance at every joint, and contact sets that only pair parts that set real limits.
 
 ## Then: finish the RobStride 02 and 13S2P switch
 The CAD now uses the RobStride 02 (`cad/parts/robstride02.sc`). What is left of the switch:
 
 1. **Battery keep-out:** size it for the 13S2P pack (26 × 21700 cells plus BMS; see `docs/battery.md`), and fix its clash with the belly pan at the same time.
-2. **Mass and torque:** add about 1.3 kg for the battery and about 0.3 kg for the motors, then recheck the knee torque estimate against the RS02's 6 N·m rating.
+2. **Mass:** add about 1.3 kg for the battery and about 0.3 kg for the motors to the mass estimate (the knee torque estimate already assumes 12.5 kg).
 3. **Power:** the head and tail servo step-down converter needs a 60 V or higher input rating. Regen with a full pack (54.6 V) can exceed the RS02's 60 V limit: plan a braking resistor, or charge only to 4.1 V per cell.
 4. **Hip-pitch actuator plug and the deck spine (left for later by the owner):** each hip-pitch actuator's upward plug swings through the deck spine between about 18° and 36° of outward abduction (212 mm³ at 25°). The outward abduction limit is about 17° until this is solved (before: just under 36°, where the hip carrier meets the deck). Options: notch the deck spine edges, narrow the spine near the hips, turn the hip-pitch actuators so the plugs point fore and aft (the carrier is symmetric every 60°, so 60° steps are free), or use a right-angle plug.
 5. **Abduction plug and mid frame:** the lower plug keep-out of each abduction actuator overlaps the 3 mm mid frame by 0.6 mm (82 mm³ each, through the new tab). The real socket starts 2.8 mm behind the rear face. Measure a real XT30(2+2)-F plug with its cable, or make the mid frame 2 mm (`t_frame` is shared; a separate thickness affects `x_mid`, the rib roots and the belly pan).
@@ -22,9 +34,7 @@ The CAD now uses the RobStride 02 (`cad/parts/robstride02.sc`). What is left of 
 9. **README images** predate the RS02, spacer and ribs (see below).
 
 ## Linkage knee (open points)
-- **Lever pin fastener:** the M5 pin through the shank lever sits 0.5 mm from the thigh plates, so it needs flush heads or a threaded insert in the printed lever.
-- **Lever strength:** the printed lever cheeks see about 22 MPa at peak torque (peak rod force about 750–1000 N). Use aluminium lever plates or a steel sleeve at the pin; an M5 bolt bearing straight on plastic will creep and wear the holes oval, putting slop in the knee.
-- **Shank print orientation:** RP-116 is meant to print flat (leg plane on the bed). Its foot core starts 5 mm further inboard than the blade's inner face (`foot_in`), so neither face sits flat and the blade needs supports along its length. Making the foot core flush with the blade face would fix this.
+The printed shank and lever (RP-116) will be replaced by the new leg's aluminium plates, which solves the earlier lever-strength, lever-pin and print-orientation issues.
 - **Hip-pitch flange screws:** the rod passes about 1 mm over the hip-pitch actuator's flange screw heads at full extension; use low-profile heads. Screws are not modelled, so the clash check cannot see this.
 - **Crank orientation:** the crank's flange holes are not turned to match the actuator's hole pattern in the model (the motor model is static). Cosmetic.
 - **Rod ends:** both modelled as right-hand thread. Use one left-hand and one right-hand so the rod length (knee zero) can be adjusted without unbolting.
@@ -102,7 +112,7 @@ The CAD now uses the RobStride 02 (`cad/parts/robstride02.sc`). What is left of 
 - Official STEP and manual: github.com/RobStride/Product_Information (`Product Literature/CAN2.0/RS02/RS02-20261030.stp`). A copy is in `cad/actuators/build/` (git-ignored; licence not checked, so not committed).
 
 ## Unverified estimates
-- Knee torque need (about 6 N·m continuous, 15 N·m peak) is a hand calculation, not a simulation.
+- Knee torque need (new leg, 12.5 kg: about 5.3 N·m RMS and 10–16 N·m peak at the actuator while trotting) is a quasi-static hand calculation (vertical foot force only, half-sine stance force, no leg inertia), not a simulation.
 - Abduction torque is about 5 N·m at a 100 N foot load (foot is 52 mm outboard of the axis), against a 6 N·m rating.
 - Power figures are scaled from commercial robots.
 - Printed-part masses assume half to nine-tenths of solid volume.

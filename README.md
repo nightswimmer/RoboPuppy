@@ -7,7 +7,13 @@ A Labrador-sized quadruped robot dog, built from 3D-printed and laser-cut parts,
 ## Status
 First detailed design pass. The whole robot is modelled as an articulated assembly: torso, four legs, neck, head and tail. Two knee drives are modelled side by side: a belt drive and a crank-and-pushrod linkage. Every part is its own file, linked into the assemblies, so the bill of materials comes straight from the model. Fasteners, servo mounts and some drive details are still missing, and nothing has been built yet.
 
-The leg actuators are now RobStride 02s, modelled from the official STEP file. A simplified motion rig of the whole robot is used to find the joint ranges by dragging the legs. The battery is changing from 10S to 13S2P; the model's battery space has not been resized yet. The pictures below still show the earlier RobStride 01 model.
+The leg actuators are now RobStride 02s, modelled from the official STEP file. A simplified motion rig of the whole robot is used to find the joint ranges by dragging the legs. A new leg is being designed in this rig first:
+- shorter 200 mm links, close to the Unitree Go2;
+- a crescent-shaped thigh;
+- a shank made of two curved aluminium plates;
+- a knee that folds far enough for the feet to touch the hips when lying down.
+
+The battery is changing from 10S to 13S2P; the model's battery space has not been resized yet. The pictures below still show the earlier RobStride 01 model.
 
 ## Design targets
 - Torso about 60 cm long, with the rest scaled to a dog of that size
@@ -30,6 +36,7 @@ Power comes from a 13S2P Li-ion pack: 26 × 21700 cells, 46.8 V nominal, 468 Wh,
 - **Legs:** an abduction actuator on the torso, a hip-pitch actuator in a printed carrier, and a knee actuator at the hip, coaxial with the hip pitch. Two ways of driving the knee are modelled:
   - **Belt:** a 1.5:1 HTD 5M belt between two laser-cut thigh plates. A printed horseshoe spacer clamps the plates together around the hip. The shank, knee pulley and foot core are one printed part.
   - **Linkage:** a crank on the knee actuator and a pushrod with rod ends down the back of the thigh, driving a lever on the shank (about 1.4:1 standing, knee fold 45–140°). The thigh plates taper and sit closer together. The robot is 30 mm narrower and about 0.7 kg lighter.
+  - **New linkage leg (motion rig only, for now):** 200 mm thigh and shank. The thigh plates are a crescent, and the shank is two curved 3 mm aluminium plates with the rod end clamped between them. The knee folds 60–159°, with a ratio of about 1.3–1.4:1 while trotting, which keeps the knee actuator within its rating.
 - **Shared parts:** left and right legs are mirror images built from the same parts. Each fabricated part is symmetric, or works turned over, so one print or cut file serves both sides. One hip carrier design fits all four hips.
 - **Torso:** each pair of abduction actuators is clamped between two aluminium plates. A printed belly pan forms the central bay and an aluminium deck closes the top. The actuators' power plugs pass through slots in the deck and notches in the belly pan. The deck runs on as a spine to the neck and tail, stiffened by a bent aluminium rib under each end.
 - **Neck and head:** a tilt servo on the deck nods the whole neck; a pan servo at the top of the neck turns a hollow printed head with a camera behind each eye.
@@ -42,8 +49,8 @@ Power comes from a 13S2P Li-ion pack: 26 × 21700 cells, 46.8 V nominal, 468 Wh,
 | Torso structure length | 612 mm |
 | Hip spacing, front to rear | 420 mm |
 | Width | 333 mm (belt knee), 303 mm (linkage knee) |
-| Thigh / shank | 242 mm / 242 mm |
-| Back height, standing | about 470 mm |
+| Thigh / shank | 242 mm / 242 mm (new leg in the motion rig: 200 / 200 mm) |
+| Back height, standing | about 470 mm (motion rig: about 370 mm) |
 | Estimated mass | 10.8–11.5 kg |
 
 The bills of materials are in [cad/robot/bom.csv](cad/robot/bom.csv) (belt knee: 27 items, 20 of them fabricated) and [cad/robot/bom_linkage.csv](cad/robot/bom_linkage.csv) (linkage knee: 27 items).
@@ -71,7 +78,11 @@ node cad/scripts/build.js pose robot_linkage Knee -45 -140   # the same on the l
 
 Without `--app` the scripts use `solidcraft-cli`. With `--app` they run in the open SolidCraft desktop app through its local control channel, which needs "Let AI agents connect" turned on in the app. Use `--app` when Windows will not start the command-line tool, for example when Smart App Control blocks unsigned programs.
 
-The motion rig (`cad/robot/motion_rig.sc`) has simplified legs with the real link lengths, joint positions and joint limits, laid out so that SolidCraft can drag them with the mouse. Turn contact off (Disable Contact) before dragging: live collision checking is too slow on this model. The link lengths (`lt`, `ls`, `lk_a`, `lk_b`, `lk_c`) can be changed in the app's parameter table.
+The motion rig (`cad/robot/motion_rig.sc`) has simplified legs with real link lengths, joint positions and joint limits, laid out so that SolidCraft can drag them with the mouse. It currently carries the new leg design. It is saved with contact off, because live collision checking is too slow on this model. The link lengths and linkage (`lt`, `ls`, `lk_a`, `lk_b`, `lk_c`, `lk_d`) can be changed in the app's parameter table.
+
+```
+node cad/scripts/build.js pose rig Knee -60 -86 -120 -159   # clash check of the rig at these knee angles
+```
 
 Production files (cut files, print files, STEP) are not stored in the repository. They will be exported once the design is complete.
 
