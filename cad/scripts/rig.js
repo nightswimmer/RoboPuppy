@@ -34,15 +34,20 @@ const LT = 200, LS = 200;
 const NL = {
   a: 22, b: 28, c_off: 3, d: -12,             // crank, lever, rod = lt + c_off, lever pin angle (deg, + toward the rear)
   crank_t: 5,                                // crank 5 mm (was 6), so the rod sits on the cavity's mid-plane
-  shank_w: 26, lean: 8, bend_r: 172.5,       // shank plates: 26 wide, straight from the knee leaning 8 deg forward,
-                                             // then an arc of this radius (centreline) that brings the foot back under the knee
+  // shank plates, 26 wide, along an S-shaped centreline: a short line from the knee leaning `lean` deg toward the rear,
+  // an arc (s_r1) turning toward the front, then an arc (s_r2) turning back that ends at the foot, under the knee
+  // (about 15 mm forward bulge at mid-length, 1 mm to the rear near the knee)
+  shank_w: 26, lean: 4, lean_l: 15, s_r1: 150, s_r2: 175,
   top_r: 16, boss_r: 8,                      // shank plate top: round about the knee axle, joined to a boss round the lever pin
-  // thigh plates: a crescent. Hip round (plate_w/2), knee round, a convex rear edge and a concave front edge (both arcs
-  // centred in front, tangent to the two rounds), so the folded shank stays outside the thigh except near the knee.
-  knee_r: 20, rear_r: 300, front_r: 200,
+  // thigh plates: a hook. Hip round (plate_w/2) and knee round; the rear edge is two convex arcs (nearly straight from
+  // the hip, then a tighter one into the knee round), the front edge two concave arcs (a long one from the hip round,
+  // then a tight one into the knee round), so the bend is near the knee and the folded shank nests in front of it.
+  // The junctions are at rear_j and front_j times lt below the hip. The front edge stays at least 1.5 mm in front
+  // of the rod at every fold.
+  knee_r: 20, rear_r: [1200, 230], front_r: [210, 40], rear_j: 0.4, front_j: 0.75,
   // thigh standoffs (x, z below the hip): four behind the rod, one in front of it near the hip
   so: [[-40, 45], [-41, 85], [-39, 120], [-36, 145], [3.5, 55]],
-  sso: [55, 104],                            // shank spacers, along the straight part from the knee
+  sso: [55, 125],                            // shank spacers, at these distances along the centreline from the knee
   tube_d: 14,                                // spacer tube on the knee axle, between the shank plates (the rod passes 3.6 mm from it)
 };
 const GEOM = { a: NL.a, b: NL.b, c: LT + NL.c_off, dl: NL.d, lt: LT };
@@ -106,41 +111,64 @@ const HIP = component("Hip", [
 // The carrier block face is 0.3 mm short of the abduction actuator flange and the hip flange 0.3 mm short of the
 // thigh plate, so parts joined face to face do not count as touching when contact is on.
 
-// ---- thigh plate outline, in the leg plane (x forward, z up): a crescent of four tangent arcs. Hip round (plate_w/2)
-// and knee round; rear edge = a circle of radius NL.rear_r round both (centre in front, touching them inside); front
-// edge = a circle of radius NL.front_r outside both (centre in front). Initial points; the constraints place them. ----
+// ---- thigh plate outline, in the leg plane (x forward, z up): hip round (plate_w/2) and knee round, joined at the
+// rear by two convex arcs (centres in front, the rounds inside them) and at the front by two concave arcs (centres in
+// front, the rounds outside them), each pair tangent at a junction set by its height. Initial points only; the sketch
+// constraints place them. ----
+const v2 = { add: (a, b) => [a[0] + b[0], a[1] + b[1]], sub: (a, b) => [a[0] - b[0], a[1] - b[1]], mul: (a, k) => [a[0] * k, a[1] * k] };
+const unit2 = (a) => v2.mul(a, 1 / Math.hypot(a[0], a[1]));
+// the point at distance d0 from c0 and d1 from c1, on side sd of the line c0 -> c1
+function cci(c0, d0, c1, d1, sd) {
+  const d = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]), a = (d0 * d0 - d1 * d1 + d * d) / (2 * d), h2 = d0 * d0 - a * a;
+  if (h2 < 0) return null;
+  const u = unit2(v2.sub(c1, c0));
+  return v2.add(v2.add(c0, v2.mul(u, a)), v2.mul([-u[1], u[0]], sd * Math.sqrt(h2)));
+}
 function thighOutline() {
-  const R0 = P.plate_w / 2, r = NL.knee_r, L = LT, K = [0, -L];
-  const centre = (d0, d1) => { const z = (d1 * d1 - d0 * d0 - L * L) / (2 * L); return [Math.sqrt(d0 * d0 - z * z), z]; };
-  const Cr = centre(NL.rear_r - R0, NL.rear_r - r), Cf = centre(NL.front_r + R0, NL.front_r + r);
-  const toward = (p, c, rr, sgn) => { const d = Math.hypot(c[0] - p[0], c[1] - p[1]); return [p[0] + (sgn * rr * (c[0] - p[0])) / d, p[1] + (sgn * rr * (c[1] - p[1])) / d]; };
-  return { Cr, Cf,
-    F0: toward([0, 0], Cf, R0, 1), F1: toward(K, Cf, r, 1),      // front edge meets the hip round, the knee round
-    B0: toward([0, 0], Cr, R0, -1), B1: toward(K, Cr, r, -1) };  // rear edge meets them (away from its centre)
+  const R0 = P.plate_w / 2, r = NL.knee_r, O = [0, 0], K = [0, -LT];
+  const on = (c, rr, toward, sgn) => v2.add(c, v2.mul(unit2(v2.sub(toward, c)), sgn * rr));
+  const sweep = (c, p, q) => { let a = Math.atan2(q[1] - c[1], q[0] - c[0]) - Math.atan2(p[1] - c[1], p[0] - c[0]); while (a <= 0) a += 2 * Math.PI; return a; };
+  // scan the first arc's centre angle about the hip; keep the valid layout whose junction is nearest the target height
+  function chain(R1, R2, zj, front) {
+    let best = null;
+    for (let th = -1.5; th <= 1.2; th += 0.0005) {
+      const C1 = v2.mul([Math.cos(th), Math.sin(th)], front ? R1 + R0 : R1 - R0);
+      for (const sd of [-1, 1]) {
+        const C2 = cci(C1, R1 - R2, K, front ? R2 + r : R2 - r, sd);
+        if (!C2 || C1[0] < 0 || C2[0] < 0) continue;
+        const J = v2.add(C1, v2.mul(unit2(v2.sub(C2, C1)), R1));
+        const P0 = on(O, R0, C1, front ? 1 : -1), P1 = on(K, r, C2, front ? 1 : -1);
+        const ok = front ? sweep(C1, P0, J) < 1.6 && sweep(C2, J, P1) < 1.6 : P0[0] < 0 && J[0] < 0 && P1[0] < 0 && sweep(C1, P0, J) < 1.6 && sweep(C2, J, P1) < 1.6;
+        const e = Math.abs(J[1] + zj);
+        if (ok && (!best || e < best.e)) best = { e, C1, C2, J, P0, P1 };
+      }
+    }
+    return best;
+  }
+  const rr = chain(NL.rear_r[0], NL.rear_r[1], NL.rear_j * LT, false), ff = chain(NL.front_r[0], NL.front_r[1], NL.front_j * LT, true);
+  return { Ca: rr.C1, Cb: rr.C2, Jr: rr.J, B0: rr.P0, B1: rr.P1, Cc: ff.C1, Cd: ff.C2, Jf: ff.J, F0: ff.P0, F1: ff.P1 };
 }
 function thighPlate(body, yr, s) {
   const [a, b] = ext(yr, s), o = thighOutline(), rd = (p) => p.map(r4), c = (command, params) => ({ command, params });
+  const arc = (center, start, end) => c("sketch.arc.center_point", { center: rd(center), start: rd(start), end: rd(end) });
   return [
     // sketch x = leg X, sketch y = leg Z; the plane's normal is -Y, so the plate extrudes from y = b down to a
     c("sketch.create", { plane: { origin: [0, b, 0], x_dir: [1, 0, 0], y_dir: [0, 0, 1] }, name: body + "_Sketch" }),
-    c("sketch.arc.center_point", { center: [0, 0], start: rd(o.F0), end: rd(o.B0) }),            // a1 hip round, over the top
-    c("sketch.arc.center_point", { center: [0, r4(-LT)], start: rd(o.B1), end: rd(o.F1) }),    // a2 knee round, under it
-    c("sketch.arc.center_point", { center: rd(o.Cr), start: rd(o.B0), end: rd(o.B1) }),          // a3 rear edge (convex)
-    c("sketch.arc.center_point", { center: rd(o.Cf), start: rd(o.F0), end: rd(o.F1) }),          // a4 front edge (concave)
-    c("sketch.constraint.coincident", { a: "a3.start", b: "a1.end" }),
-    c("sketch.constraint.coincident", { a: "a3.end", b: "a2.start" }),
-    c("sketch.constraint.coincident", { a: "a4.start", b: "a1.start" }),
-    c("sketch.constraint.coincident", { a: "a4.end", b: "a2.end" }),
-    c("sketch.dimension", { entities: ["a1"], value: `${P.plate_w / 2} mm`, type: "radius" }),
-    c("sketch.dimension", { entities: ["a2"], value: `${NL.knee_r} mm`, type: "radius" }),
-    c("sketch.dimension", { entities: ["a3"], value: `${NL.rear_r} mm`, type: "radius" }),
-    c("sketch.dimension", { entities: ["a4"], value: `${NL.front_r} mm`, type: "radius" }),
+    arc([0, 0], o.F0, o.B0),            // a1 hip round, over the top
+    arc([0, -LT], o.B1, o.F1),          // a2 knee round, under it
+    arc(o.Ca, o.B0, o.Jr),              // a3 rear edge from the hip (convex, nearly straight)
+    arc(o.Cb, o.Jr, o.B1),              // a4 rear edge into the knee (convex)
+    arc(o.Cc, o.F0, o.Jf),              // a5 front edge from the hip (concave)
+    arc(o.Cd, o.Jf, o.F1),              // a6 front edge into the knee (concave, tight)
+    ...[["a3.start", "a1.end"], ["a3.end", "a4.start"], ["a4.end", "a2.start"], ["a5.start", "a1.start"], ["a5.end", "a6.start"], ["a6.end", "a2.end"]]
+      .map(([p, q]) => c("sketch.constraint.coincident", { a: p, b: q })),
+    ...[["a1", P.plate_w / 2], ["a2", NL.knee_r], ["a3", NL.rear_r[0]], ["a4", NL.rear_r[1]], ["a5", NL.front_r[0]], ["a6", NL.front_r[1]]]
+      .map(([e, v]) => c("sketch.dimension", { entities: [e], value: `${v} mm`, type: "radius" })),
     c("sketch.constraint.horizontal_vertical", { points: ["origin", "a2.center"], mode: "vertical" }),
     c("sketch.dimension", { entities: ["origin", "a2.center"], value: "lt", type: "vertical" }),
-    c("sketch.constraint.tangent", { a: "a3", b: "a1" }),
-    c("sketch.constraint.tangent", { a: "a3", b: "a2" }),
-    c("sketch.constraint.tangent", { a: "a4", b: "a1" }),
-    c("sketch.constraint.tangent", { a: "a4", b: "a2" }),
+    ...[["a3", "a1"], ["a3", "a4"], ["a4", "a2"], ["a5", "a1"], ["a5", "a6"], ["a6", "a2"]].map(([p, q]) => c("sketch.constraint.tangent", { a: p, b: q })),
+    c("sketch.dimension", { entities: ["origin", "a3.end"], value: `${NL.rear_j} * lt`, type: "vertical" }),
+    c("sketch.dimension", { entities: ["origin", "a5.end"], value: `${NL.front_j} * lt`, type: "vertical" }),
     c("sketch.solve", {}),
     c("sketch.finish", {}),
     c("solid.extrude", { distance: r4(b - a), operation: "new", body_name: body, name: body }),
@@ -151,7 +179,7 @@ function thighPlate(body, yr, s) {
 function thigh(name, s) {
   const pre = name + "_";
   const plate = (body, yr) => thighPlate(body, yr, s);
-  const { Cf } = thighOutline();
+  const { Cc } = thighOutline();
   const [c0] = ext(Y.cav, s);
   return component(name, [
     ...plate(pre + "InnerPlate", Y.innerPlate),
@@ -161,8 +189,8 @@ function thigh(name, s) {
     { command: "solid.box", params: { length: P.plate_w / 2 + 10 + P.lk_sp_x0, width: P.cav_lk + 2, height: P.plate_w + 20,
       corner: [-(P.plate_w / 2 + 10), c0 - 1, -(P.plate_w / 2 + 10)], operation: "cut", targets: [pre + "Spacer"], name: pre + "SpacerRear" } },
     { command: "solid.cylinder", params: { diameter: P.lk_sp_bore_d, height: P.cav_lk + 2, base: [0, c0 - 1, 0], axis: "Y", operation: "cut", targets: [pre + "Spacer"], name: pre + "SpacerBore" } },
-    // ... trimmed to the plates' concave front edge
-    { command: "solid.cylinder", params: { diameter: 2 * NL.front_r, height: P.cav_lk + 2, base: [r4(Cf[0]), c0 - 1, r4(Cf[1])], axis: "Y", operation: "cut", targets: [pre + "Spacer"], name: pre + "SpacerFront" } },
+    // ... trimmed to the plates' concave front edge (its upper arc)
+    { command: "solid.cylinder", params: { diameter: 2 * NL.front_r[0], height: P.cav_lk + 2, base: [r4(Cc[0]), c0 - 1, r4(Cc[1])], axis: "Y", operation: "cut", targets: [pre + "Spacer"], name: pre + "SpacerFront" } },
     ...NL.so.map(([x, z], i) => cyl(pre + "Standoff" + (i + 1), P.standoff_d, [x, -z], Y.cav, s)),
     // knee actuator, output inward onto the crank
     cyl(pre + "Motor", P.rs_body_d, [0, 0], Y.kneeBody, s),
@@ -173,57 +201,79 @@ function thigh(name, s) {
   ]);
 }
 
-// ---- shank, in a frame on the knee axis (leg Y kept): two curved plates, each a band along a centreline (a line
-// from the knee leaning NL.lean forward, then a tangent arc that ends under the knee at the foot, so it follows ls)
-// and a rounded top (a round about the axle joined to a boss round the lever pin); a tube on the axle and spacers
-// between them; the lever pin hole through both tops; the foot pad. The curve is not symmetric front to back, so left
-// and right are two definitions (the real plates are flat and serve both sides turned over). ----
+// ---- shank, in a frame on the knee axis (leg Y kept): two curved plates, each a band along an S-shaped centreline
+// (a short line from the knee leaning NL.lean toward the rear, an arc turning toward the front, then an arc turning
+// back that ends under the knee at the foot, so it follows ls) and a rounded top (a round about the axle joined to a
+// boss round the lever pin); a tube on the axle and spacers between them; the lever pin hole through both tops; the
+// foot pad. The curve is not symmetric front to back, so left and right are two definitions (the real plates are flat
+// and serve both sides turned over). ----
 const PIN = ["lk_b * cos(90 deg + lk_d)", "lk_b * sin(90 deg + lk_d)"];   // lever pin, in the shank frame
 
-// Centreline for the initial drawing (the sketch constraints then place it): straight part to M, arc centre C.
+// Centreline for the initial drawing (the sketch constraints then place it): line to M, arc 1 (centre C1, turning
+// toward the front) to J, arc 2 (centre C2, turning back) to the foot F. Newton on the two turns so that F = (0, -ls).
 function centreline() {
-  const e = (NL.lean * Math.PI) / 180, R = NL.bend_r, ls = LS;
-  // F = M + R (radial at M turned back by u) must be (0, -ls): Newton on the straight length l and the turn u
-  const f = (l, u) => [l * Math.sin(e) - R * Math.cos(e) + R * Math.cos(e - u), -l * Math.cos(e) - R * Math.sin(e) + R * Math.sin(e - u) + ls];
-  let l = 0.5 * ls, u = 0.5;
-  for (let k = 0; k < 50; k++) {
-    const f0 = f(l, u), h = 1e-7, fl = f(l + h, u), fu = f(l, u + h);
-    const j = [(fl[0] - f0[0]) / h, (fu[0] - f0[0]) / h, (fl[1] - f0[1]) / h, (fu[1] - f0[1]) / h], det = j[0] * j[3] - j[1] * j[2];
-    l -= (j[3] * f0[0] - j[1] * f0[1]) / det;
-    u -= (-j[2] * f0[0] + j[0] * f0[1]) / det;
+  const d0 = (-(90 + NL.lean) * Math.PI) / 180, R1 = NL.s_r1, R2 = NL.s_r2;
+  const M = [NL.lean_l * Math.cos(d0), NL.lean_l * Math.sin(d0)];
+  const C1 = v2.add(M, v2.mul([-Math.sin(d0), Math.cos(d0)], R1));
+  const at = (u1, u2) => {
+    const a1 = Math.atan2(M[1] - C1[1], M[0] - C1[0]) + u1, J = v2.add(C1, [R1 * Math.cos(a1), R1 * Math.sin(a1)]);
+    const d1 = d0 + u1, C2 = v2.add(J, v2.mul([Math.sin(d1), -Math.cos(d1)], R2));
+    const a2 = Math.atan2(J[1] - C2[1], J[0] - C2[0]) - u2;
+    return { J, C2, F: v2.add(C2, [R2 * Math.cos(a2), R2 * Math.sin(a2)]) };
+  };
+  let u1 = 0.4, u2 = 0.7;
+  for (let k = 0; k < 60; k++) {
+    const f0 = at(u1, u2).F, h = 1e-7, fa = at(u1 + h, u2).F, fb = at(u1, u2 + h).F, e = [f0[0], f0[1] + LS];
+    const j = [(fa[0] - f0[0]) / h, (fb[0] - f0[0]) / h, (fa[1] - f0[1]) / h, (fb[1] - f0[1]) / h], det = j[0] * j[3] - j[1] * j[2];
+    u1 -= (j[3] * e[0] - j[1] * e[1]) / det;
+    u2 -= (-j[2] * e[0] + j[0] * e[1]) / det;
   }
-  const M = [l * Math.sin(e), -l * Math.cos(e)];
-  return { e, M, C: [M[0] - R * Math.cos(e), M[1] - R * Math.sin(e)] };
+  const { J, C2, F } = at(u1, u2);
+  // a point at distance d along the centreline from the knee
+  const along = (d) => {
+    if (d <= NL.lean_l) return v2.mul([Math.cos(d0), Math.sin(d0)], d);
+    d -= NL.lean_l;
+    if (d <= R1 * u1) { const t = Math.atan2(M[1] - C1[1], M[0] - C1[0]) + d / R1; return v2.add(C1, [R1 * Math.cos(t), R1 * Math.sin(t)]); }
+    d -= R1 * u1;
+    const t = Math.atan2(J[1] - C2[1], J[0] - C2[0]) - d / R2;
+    return v2.add(C2, [R2 * Math.cos(t), R2 * Math.sin(t)]);
+  };
+  return { d0, M, C1, J, C2, F, along };
 }
 
 function shankPlate(body, yr, s) {
-  const [a, b] = ext(yr, s), { e, M, C } = centreline(), ls = LS, w = NL.shank_w / 2;
+  const [a, b] = ext(yr, s), { d0, M, C1, J, C2 } = centreline(), ls = LS, w = NL.shank_w / 2;
   const rd = (p) => p.map(r4), off = (p, n, d) => rd([p[0] + n[0] * d, p[1] + n[1] * d]);
-  const nTop = [Math.cos(e), Math.sin(e)];                                // front normal of the straight part
-  const nFoot = [-C[0] / NL.bend_r, (-ls - C[1]) / NL.bend_r];            // outward radial at the foot
+  const nTop = [-Math.sin(d0), Math.cos(d0)];                             // front normal of the line from the knee
+  const nFoot = unit2(v2.sub([0, -ls], C2));                              // radial at the foot (its front normal)
   const c = (command, params) => ({ command, params });
   return [
     // sketch x = leg X, sketch y = leg Z; the plane's normal is -Y, so the plate extrudes from y = b down to a
     c("sketch.create", { plane: { origin: [0, b, 0], x_dir: [1, 0, 0], y_dir: [0, 0, 1] }, name: body + "_Sketch" }),
     c("sketch.line", { points: [[0, 0], rd(M)] }),                                        // l1, tied to the origin
-    c("sketch.arc.center_point", { center: rd(C), start: [0, r4(-ls)], end: rd(M) }),      // a1, foot to M
-    c("sketch.constraint.coincident", { a: "a1.end", b: "l1.end" }),
+    c("sketch.arc.center_point", { center: rd(C1), start: rd(M), end: rd(J) }),            // a1, M to J (toward the front)
+    c("sketch.arc.center_point", { center: rd(C2), start: [0, r4(-ls)], end: rd(J) }),     // a2, foot to J (back)
+    c("sketch.constraint.coincident", { a: "a1.start", b: "l1.end" }),
     c("sketch.constraint.tangent", { a: "l1", b: "a1" }),
-    c("sketch.dimension", { entities: ["a1"], value: `${NL.bend_r} mm`, type: "radius" }),
-    c("sketch.constraint.horizontal_vertical", { points: ["origin", "a1.start"], mode: "vertical" }),
-    c("sketch.dimension", { entities: ["origin", "a1.start"], value: "ls", type: "vertical" }),
-    c("sketch.dimension", { entities: ["l1"], value: `${-(90 - NL.lean)} deg`, type: "angle" }),
-    c("sketch.construction", { curves: ["l1", "a1"] }),
-    // band edges: l2, a2 in front (p1 at the knee, p3 at the foot) and l3, a3 behind (p4, p6)
+    c("sketch.constraint.coincident", { a: "a2.end", b: "a1.end" }),
+    c("sketch.constraint.tangent", { a: "a1", b: "a2" }),
+    c("sketch.dimension", { entities: ["a1"], value: `${NL.s_r1} mm`, type: "radius" }),
+    c("sketch.dimension", { entities: ["a2"], value: `${NL.s_r2} mm`, type: "radius" }),
+    c("sketch.constraint.horizontal_vertical", { points: ["origin", "a2.start"], mode: "vertical" }),
+    c("sketch.dimension", { entities: ["origin", "a2.start"], value: "ls", type: "vertical" }),
+    c("sketch.dimension", { entities: ["l1"], value: `${-(90 + NL.lean)} deg`, type: "angle" }),
+    c("sketch.dimension", { entities: ["l1"], value: `${NL.lean_l} mm`, type: "length" }),
+    c("sketch.construction", { curves: ["l1", "a1", "a2"] }),
+    // band edges: l2, a3, a4 in front (p1 at the knee ... p4 at the foot) and l3, a5, a6 behind (p5 ... p8)
     c("sketch.offset", { curves: ["l1"], distance: `${w} mm`, symmetric: true }),
-    // round ends: a4 about the knee (over the top), a5 about the foot (under it)
+    // round ends: a7 about the knee (over the top), a8 about the foot (under it)
     c("sketch.arc.center_point", { center: [0, 0], start: off([0, 0], nTop, w), end: off([0, 0], nTop, -w) }),
-    c("sketch.constraint.coincident", { a: "a4.start", b: "p1" }),
-    c("sketch.constraint.coincident", { a: "a4.end", b: "p4" }),
+    c("sketch.constraint.coincident", { a: "a7.start", b: "p1" }),
+    c("sketch.constraint.coincident", { a: "a7.end", b: "p5" }),
     c("sketch.arc.center_point", { center: [0, r4(-ls)], start: off([0, -ls], nFoot, -w), end: off([0, -ls], nFoot, w) }),
-    c("sketch.constraint.coincident", { a: "a5.center", b: "a1.start" }),
-    c("sketch.constraint.coincident", { a: "a5.start", b: "p6" }),
-    c("sketch.constraint.coincident", { a: "a5.end", b: "p3" }),
+    c("sketch.constraint.coincident", { a: "a8.center", b: "a2.start" }),
+    c("sketch.constraint.coincident", { a: "a8.start", b: "p8" }),
+    c("sketch.constraint.coincident", { a: "a8.end", b: "p4" }),
     c("sketch.solve", {}),
     c("sketch.finish", {}),
     c("solid.extrude", { distance: r4(b - a), operation: "new", body_name: body, name: body }),
@@ -256,7 +306,7 @@ function shankTop(body, yr, s) {
 }
 
 function shank(name, s) {
-  const pre = name + "_", e = (NL.lean * Math.PI) / 180;
+  const pre = name + "_", { along } = centreline();
   const y0 = s > 0 ? Y.shankIn[0] - 1 : -(Y.shankOut[1] + 1);
   return component(name, [
     ...shankPlate(pre + "PlateIn", Y.shankIn, s),
@@ -266,7 +316,7 @@ function shank(name, s) {
     { command: "solid.cylinder", params: { diameter: 5.5, height: Y.shankOut[1] - Y.shankIn[0] + 2, base: [PIN[0], y0, PIN[1]],
       axis: "Y", operation: "cut", targets: [pre + "TopIn", pre + "TopOut"], name: pre + "PinHole" } },
     cyl(pre + "Tube", NL.tube_d, [0, 0], Y.gap, s),
-    ...NL.sso.map((d, i) => cyl(pre + "Spacer" + (i + 1), P.standoff_d, [d * Math.sin(e), -d * Math.cos(e)], Y.gap, s)),
+    ...NL.sso.map((d, i) => cyl(pre + "Spacer" + (i + 1), P.standoff_d, along(d).map(r4), Y.gap, s)),
     cyl(pre + "Foot", P.foot_pad_od, [0, "-ls"], Y.foot, s),
   ]);
 }
@@ -279,6 +329,7 @@ const CRANK = component("Crank", [
 ]);
 
 // ---- pushrod with its two rod ends, in a frame at the crank-end ball centre, rod along +X, centred on the rod plane.
+// The rod is an 8 x 4 mm aluminium tube (rod_bore_d), tapped M5 at each end.
 // Ball and rod are 0.25 mm thinner each side than the real parts, so they clear the crank and the clevis by 0.25 mm
 // (rod 7.5, ball 7.5 wide). The pin at the lever end runs between the shank plates' outer faces. ----
 const ROD = component("Rod", [
@@ -286,6 +337,7 @@ const ROD = component("Rod", [
   cyl("Rod_BallA", P.re_ball_d, [0, 0], [-(P.re_ball_w - 0.5) / 2, (P.re_ball_w - 0.5) / 2]),
   { command: "solid.cylinder", params: { diameter: P.re_neck_d, height: P.re_neck, base: [0, 0, 0], axis: "X", operation: "new", body_name: "Rod_NeckA", name: "Rod_NeckA" } },
   { command: "solid.cylinder", params: { diameter: P.rod_d - 0.5, height: `lk_c - ${2 * P.rod_end_gap} mm`, base: [P.rod_end_gap, 0, 0], axis: "X", operation: "new", body_name: "Rod_Bar", name: "Rod_Bar" } },
+  { command: "solid.cylinder", params: { diameter: P.rod_bore_d, height: `lk_c - ${2 * P.rod_end_gap - 2} mm`, base: [P.rod_end_gap - 1, 0, 0], axis: "X", operation: "cut", targets: ["Rod_Bar"], name: "Rod_Bore" } },
   { command: "solid.cylinder", params: { diameter: P.re_neck_d, height: P.re_neck, base: [`lk_c - ${P.re_neck} mm`, 0, 0], axis: "X", operation: "new", body_name: "Rod_NeckB", name: "Rod_NeckB" } },
   cyl("Rod_EyeB", P.re_d, ["lk_c", 0], [-P.re_t / 2, P.re_t / 2]),
   cyl("Rod_BallB", P.re_ball_d, ["lk_c", 0], [-(P.re_ball_w - 0.5) / 2, (P.re_ball_w - 0.5) / 2]),

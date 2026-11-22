@@ -64,7 +64,7 @@ module.exports = {
   lk_c: 244.2,           // pushrod: rod-end ball centre to ball centre
   crank_t: 6, crank_hub_d: 40, crank_arm_w: 13, crank_cb_d: 8, crank_cb_depth: 3,   // 6 mm aluminium crank, counterbored M4
   re_d: 18, re_t: 6, re_ball_d: 11, re_ball_w: 8, re_neck_d: 7, re_neck: 14, re_bore_d: 5,   // M5 male rod end (SA5 T/K size), envelope
-  rod_d: 8, rod_end_gap: 18, rod_thread: 15,   // pushrod; it starts rod_end_gap from each ball centre (rod-end neck + jam nut)
+  rod_d: 8, rod_bore_d: 4, rod_end_gap: 18, rod_thread: 15,   // pushrod: 8 x 4 mm 6061 tube, the bore opened to the M5 tap drill at each end; it starts rod_end_gap from each ball centre (rod-end neck + jam nut)
   lk_hub_d: 24, lever_w: 20, lk_seat: 5,       // shank hub, lever width, 688 bearing seat depth at each end
   lk_sp_bore_d: 44, lk_sp_x0: 8,               // hip spacer: bore around the crank hub; rear edge clear of the crank and rod
   lk_so_x1: 26, lk_so_z1: 95, lk_so_x2: 15, lk_so_z2: 185,   // standoffs, all in the front half (the rod runs at the rear)

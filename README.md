@@ -9,8 +9,8 @@ First detailed design pass. The whole robot is modelled as an articulated assemb
 
 The leg actuators are now RobStride 02s, modelled from the official STEP file. A simplified motion rig of the whole robot is used to find the joint ranges by dragging the legs. A new leg is being designed in this rig first:
 - shorter 200 mm links, close to the Unitree Go2;
-- a crescent-shaped thigh;
-- a shank made of two curved aluminium plates;
+- a thigh that bends near the knee, like a hook;
+- a shank made of two S-shaped aluminium plates;
 - a knee that folds far enough for the feet to touch the hips when lying down.
 
 The battery is changing from 10S to 13S2P; the model's battery space has not been resized yet. The pictures below still show the earlier RobStride 01 model.
@@ -35,8 +35,8 @@ Power comes from a 13S2P Li-ion pack: 26 × 21700 cells, 46.8 V nominal, 468 Wh,
 
 - **Legs:** an abduction actuator on the torso, a hip-pitch actuator in a printed carrier, and a knee actuator at the hip, coaxial with the hip pitch. Two ways of driving the knee are modelled:
   - **Belt:** a 1.5:1 HTD 5M belt between two laser-cut thigh plates. A printed horseshoe spacer clamps the plates together around the hip. The shank, knee pulley and foot core are one printed part.
-  - **Linkage:** a crank on the knee actuator and a pushrod with rod ends down the back of the thigh, driving a lever on the shank (about 1.4:1 standing, knee fold 45–140°). The thigh plates taper and sit closer together. The robot is 30 mm narrower and about 0.7 kg lighter.
-  - **New linkage leg (motion rig only, for now):** 200 mm thigh and shank. The thigh plates are a crescent, and the shank is two curved 3 mm aluminium plates with the rod end clamped between them. The knee folds 60–159°, with a ratio of about 1.3–1.4:1 while trotting, which keeps the knee actuator within its rating.
+  - **Linkage:** a crank on the knee actuator and a pushrod (an 8 × 4 mm aluminium tube) with rod ends down the back of the thigh, driving a lever on the shank (about 1.4:1 standing, knee fold 45–140°). The thigh plates taper and sit closer together. The robot is 30 mm narrower and about 0.7 kg lighter.
+  - **New linkage leg (motion rig only, for now):** 200 mm thigh and shank. The thigh plates bend near the knee, so the folded shank tucks in front of them. The shank is two S-shaped 3 mm aluminium plates with the rod end clamped between them. The knee folds 60–159°, with a ratio of about 1.3–1.4:1 while trotting, which keeps the knee actuator within its rating.
 - **Shared parts:** left and right legs are mirror images built from the same parts. Each fabricated part is symmetric, or works turned over, so one print or cut file serves both sides. One hip carrier design fits all four hips.
 - **Torso:** each pair of abduction actuators is clamped between two aluminium plates. A printed belly pan forms the central bay and an aluminium deck closes the top. The actuators' power plugs pass through slots in the deck and notches in the belly pan. The deck runs on as a spine to the neck and tail, stiffened by a bent aluminium rib under each end.
 - **Neck and head:** a tilt servo on the deck nods the whole neck; a pan servo at the top of the neck turns a hollow printed head with a camera behind each eye.

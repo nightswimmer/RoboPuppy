@@ -1,19 +1,20 @@
 # Handoff – what's left to do
 
 ## Next: the new leg (motion rig)
-The new leg exists only in `cad/robot/motion_rig.sc` (`rig.js`): 200/200 mm, crescent thigh, shank of two curved aluminium plates, knee 60–159°, four-bar crank 22 / lever 28 at −12° / rod lt + 3 (see PROJECT_INSTRUCTIONS.md, Decisions). The owner may still tweak it by dragging the rig (saved with contact off).
+The new leg exists only in `cad/robot/motion_rig.sc` (`rig.js`): 200/200 mm, a hook-shaped thigh that bends near the knee, a shank of two S-shaped aluminium plates, knee 60–159°, four-bar crank 22 / lever 28 at −12° / rod lt + 3 (see PROJECT_INSTRUCTIONS.md, Decisions). The owner may still tweak it by dragging the rig (saved with contact off).
 
 1. **Remaining joint ranges:** abduction (±45° in the rig) and hip pitch (±120°) are still to be set from the rig. Limits are plain numbers in `LIMITS` at the top of `rig.js`. Known: abduction outward about 17° (hip-pitch plug and deck spine), inward 36° (same-side legs collide).
 2. **Carry the new leg into the part files and both robots (big change: remind the owner to push to GitHub first).** What it involves:
    - In `dims.js`, `lt` and `ls` become 200 (the new leg's own numbers are in `NL` in `rig.js`).
-   - New part files: crescent thigh plates, curved shank plates (one flat plate should serve both sides turned over; the rig has handed definitions only for convenience), shank spacers, axle tube, new crank and pushrod lengths.
+   - New part files: hook-shaped thigh plates and S-shaped shank plates (one flat plate should serve both sides turned over; the rig has handed definitions only for convenience), shank spacers, axle tube, new crank and pushrod lengths. The outlines can be copied from `thighPlate`, `shankPlate` and `centreline` in `rig.js` (fully constrained). RP-115 is already an 8 × 4 tube; only its length (`lk_c`) changes.
    - Retire the printed shank (RP-116) and the old tapered plates.
    - Update `leg_linkage.sc`, `robot_linkage.sc`, the BOMs and the joint limits in `assemblies.js`.
    - Decide what happens to the belt variant: its belt length and thigh are tied to 242.2 mm.
    - Rerun the symmetry, clash and pose checks.
-   - The 2D checker used to place the standoffs (shapely, in the session scratchpad, not saved) can be rewritten if needed: thigh outline, swept rod and shank, free space.
+   - The 2D checkers (shapely, then Node with sketch tracing and a headless-Edge render, both in session scratchpads, not saved) can be rewritten if needed: thigh outline, swept rod and shank, free space.
 3. **Open points on the new leg:**
-   - **Plate ties:** the lowest thigh standoff is 145 mm below the hip, so in the lower 55 mm only the knee axle ties the two thigh plates. Check the stiffness, or add a tie in front of the knee where the shank does not pass.
+   - **Plate ties:** the lowest thigh standoff is 145 mm below the hip, so in the lower 55 mm only the knee axle ties the two thigh plates. The reshaped thigh is also narrowest there (about 34 mm). Check the stiffness, or add a tie in front of the knee where the shank does not pass.
+   - **Thin cover over the rod:** the thigh's front edge is only about 1.5 mm in front of the rod at the extreme folds, around 120–150 mm below the hip. That's enough as a cover, but check it once fasteners and real rod-end sizes are in.
    - **Rod and lever forces:** at about 23 N·m knee peak and a 28 mm lever, the rod sees about 1 kN at trotting folds and more near the fold ends (transmission angle down to 18°). Check the M5 rod ends, the lever pin and the 3 mm plate bearing area round the pin (a sleeve or a thicker boss may be needed).
    - **Flush fasteners:** the shank plates run 2 mm inside the thigh plates, so the shank spacer screws and the lever pin need countersunk or flush heads (not modelled).
    - **Rod outside the thigh:** the longer lever makes the rod end and lever pin stick out of the knee round a little more than before (accepted by the owner, as on the Unitree legs). Check that it clears the ground and the other legs when lying down.
@@ -37,12 +38,14 @@ The CAD now uses the RobStride 02 (`cad/parts/robstride02.sc`). What is left of 
 The printed shank and lever (RP-116) will be replaced by the new leg's aluminium plates, which solves the earlier lever-strength, lever-pin and print-orientation issues.
 - **Hip-pitch flange screws:** the rod passes about 1 mm over the hip-pitch actuator's flange screw heads at full extension; use low-profile heads. Screws are not modelled, so the clash check cannot see this.
 - **Crank orientation:** the crank's flange holes are not turned to match the actuator's hole pattern in the model (the motor model is static). Cosmetic.
-- **Rod ends:** both modelled as right-hand thread. Use one left-hand and one right-hand so the rod length (knee zero) can be adjusted without unbolting.
+- **Rod ends:** both modelled as right-hand thread. Use one left-hand (SAL5 T/K) and one right-hand so the rod length (knee zero) can be adjusted without unbolting.
+- **Pushrod tube on arrival:** check the temper with a bend test on an offcut (T6 barely flexes and springs back; O temper bends permanently), and check that the bore is 4.0–4.2 mm so the M5 thread is full depth. Practise the tap on an offcut.
 - **Rod-end thread stud** not modelled.
 - **Checks not run on the linkage robot:** hip-pitch sweeps, and a continuous knee sweep (`joint.find_limits` stalls because the rod ends touch the crank and lever face to face; use discrete knee angles).
 - **Choose the variant:** belt or linkage, once the open points above are weighed.
 
 ## Open question for the owner
+- **Purchasing list:** the CAD BOMs (`cad/robot/bom*.csv`, `cad/leg/leg*_bom.csv`) are regenerated by every build and list only modelled parts. Nothing lists the battery, BMS, converters, compute, CAN wiring, connectors or fasteners. Suggested: a hand-maintained `docs/purchasing_bom.md` that points to the CAD BOMs for the mechanical parts. The owner has not decided yet.
 - Remove the remaining superseded files? (`cad/leg/leg_module_concept.sc`, `cad/robot/robot_blockout.sc` and its two renders, `cad/scripts/gen_blockout.js`, `cad/actuators/RS01_reference.sc`.) `cad/parts/robstride01.sc` is kept by the owner's choice, but nothing uses it and its definition is gone from `parts.js`; note that its front and rear screw patterns are 20° out of phase with the real actuator.
 - Which of the clashes below should be fixed, and how?
 

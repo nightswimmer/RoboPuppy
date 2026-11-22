@@ -611,11 +611,14 @@ def("knee_crank", { body: "KneeCrank", part_number: "RP-114", sym: { axis: "y" }
   p.hole("RodPin", "RodPin_Sketch", { thread: "M5", depth: "crank_t" });
 });
 
-// Frame: axis Z, from z = 0 to its length. Tapped for a rod end at each end.
+// Frame: axis Z, from z = 0 to its length. An 8 x 4 mm 6061 tube; each end opened to the M5 tap drill and tapped
+// for a rod end.
 def("knee_pushrod", { body: "KneePushrod", part_number: "RP-115", sym: { axis: "x" },
-  description: "Knee pushrod, dia 8 aluminium rod, tapped M5 both ends" }, (p) => {
+  description: "Knee pushrod, 8 x 4 mm 6061-T6 aluminium tube, tapped M5 both ends" }, (p) => {
   p.sketch("Rod_Sketch", "XY", 0, (s) => s.circle(0, 0, "rod_d"));
   p.extrude("Rod", "lk_c - 2*rod_end_gap", { op: "new" });
+  p.sketch("Bore_Sketch", "XY", "lk_c - 2*rod_end_gap", (s) => s.point(0, 0));
+  p.hole("Bore", "Bore_Sketch", { diameter: "rod_bore_d" });
   p.sketch("TopThread_Sketch", "XY", "lk_c - 2*rod_end_gap", (s) => s.point(0, 0));
   p.hole("TopThread", "TopThread_Sketch", { thread: "M5", depth: "rod_thread" });
   p.sketch("BottomThread_Sketch", { origin: [0, 0, 0], x_dir: [1, 0, 0], y_dir: [0, -1, 0] }, 0, (s) => s.point(0, 0));
