@@ -4,6 +4,7 @@
 // is a rigid move, so the part itself is never mirrored.
 const { Part } = require("./lib/dsl");
 const { neg } = require("./lib/dsl");
+const shape = require("./lib/legshape");
 
 const defs = [];
 const def = (key, info, build) => defs.push({ key, info, build });
@@ -160,16 +161,16 @@ def("hip_carrier", { body: "HipCarrier", part_number: "RP-101", sym: { axis: "z"
 // and the inner plate's holes there give a hex key access.
 const kneeM3 = (s) => s.pattern([s.point(0, "rs_m3_bcd/2")], "origin", 9);
 
-// Frame: plate in the XY plane, X forward, Y up, origin on the hip axis, knee at (0, -lt). Thickness along +Z.
+// Frame: plate in the XY plane, X forward, Y up, origin on the hip axis, knee at (0, -lt_belt). Thickness along +Z.
 // Flat with through features only, so it can be turned over: the same plate serves both sides.
 const thighPlate = (p) => {
   p.sketch("Outline_Sketch", "XY", 0, (s) => {
-    s.slot([0, 0], [0, neg("lt")], "lt", "plate_w");
+    s.slot([0, 0], [0, neg("lt_belt")], "lt_belt", "plate_w");
     s.slot(["win_x", neg("win_z0")], ["win_x", neg("win_z0 + win_len")], "win_len", "win_w");
     s.slot([neg("idl_x0"), neg("idl_z")], [neg("idl_x0 - idl_len"), neg("idl_z")], "idl_len", "idl_w");
   });
   p.extrude("Plate", "t_plate", { op: "new" });
-  p.sketch("KneeAxle_Sketch", "XY", 0, (s) => s.point(0, neg("lt")));
+  p.sketch("KneeAxle_Sketch", "XY", 0, (s) => s.point(0, neg("lt_belt")));
   p.hole("KneeAxleHole", "KneeAxle_Sketch", { diameter: "axle_d" });
   p.sketch("Standoff_Sketch", "XY", 0, (s) => {
     s.point(neg("standoff_x"), neg("so_z1"));
@@ -254,12 +255,12 @@ def("shank", { body: "Shank", part_number: "RP-105", sym: { axis: "x" },
   p.sketch("FlangeOut_Sketch", "XY", "blade_zone + pulley_w - pulley_flange_t", (s) => s.circle(0, 0, "knee_flange_d"));
   p.extrude("PulleyFlangeOut", "pulley_flange_t");
   p.sketch("Blade_Sketch", "XY", "hub_gap", (s) => {
-    const r = s.rect(neg("blade_w/2"), 0, "blade_w/2", "ls", "blade_w", "ls");
+    const r = s.rect(neg("blade_w/2"), 0, "blade_w/2", "ls_belt", "blade_w", "ls_belt");
     s.dist(r.right, "blade_w/2");
     s.on(r.bottom);
   });
   p.extrude("Blade", "blade_t");
-  p.sketch("FootCore_Sketch", "XY", "-foot_in", (s) => s.circle(0, "ls", "foot_core_d"));
+  p.sketch("FootCore_Sketch", "XY", "-foot_in", (s) => s.circle(0, "ls_belt", "foot_core_d"));
   p.extrude("FootCore", "foot_core_w");
   // knee axle bore with the outer bearing seat, then the inner bearing seat (688 bearings, 8 x 16 x 5)
   p.sketch("Axle_Sketch", "XY", "blade_zone + pulley_w", (s) => s.point(0, 0));
@@ -535,24 +536,28 @@ def("tail", { body: "Tail", part_number: "RP-306", description: "Tail rod, print
   p.extrude("Tail", "tail_l", { op: "new" });
 });
 
-// ============================ leg, linkage knee variant ============================
-// The knee actuator sits at the hip as before, but turns a crank instead of a pulley. A pushrod with a rod end at
-// each end runs down the rear of the thigh to a lever on the shank, above the knee axis. Layers across the cavity,
-// from the outer plate inward: knee actuator flange (1 mm proud), crank, rod (rod-end ring clamped between the
-// crank and, at the knee, the two cheeks of the shank lever), then the shank blade on the inner side.
-// Rod plane, from the cavity's inner face:
-const ROD_Z = "(cav_lk - (rs_flange_h - t_plate) - crank_t - re_ball_w/2)";
+// ============================ leg, linkage knee (the main design) ============================
+// The knee actuator sits at the hip as in the belt leg, but turns a crank instead of a pulley. A pushrod with a rod end
+// at each end runs down the rear of the thigh to the lever pin at the top of the shank. Layers across the cavity, from
+// the outer plate inward: knee actuator flange (1 mm proud), crank, rod (on the cavity's mid-plane), then at the knee
+// the two shank plates with the rod end clamped between them. The plate outlines come from lib/legshape.js, which the
+// motion rig uses too.
+// A sketch filled with commands from lib/legshape.js (ids start from 1, so it is a sketch of its own).
+const DIMS = require("./dims");
+const raw = (cmds) => (s) => cmds.forEach((c) => s.cmd(c.command, c.params));
 
-// Frame: as the belt thigh plates (XY plane, X forward, Y up, origin on the hip axis, knee at (0, -lt)).
-// Tapers from the hip disc (plate_w) to a small knee end. Flat with through features: turned over, it serves both sides.
+// Frame: as the belt thigh plates (XY plane, X forward, Y up, origin on the hip axis, knee at (0, -lt)). A hook: hip and
+// knee rounds joined by two convex arcs at the rear and two concave arcs at the front, so it bends near the knee and the
+// folded shank nests in front of it. Flat with through features: turned over, it serves both sides.
 const thighPlateLk = (p) => {
-  p.sketch("Outline_Sketch", "XY", 0, (s) => s.taper("plate_w/2", "lt", "lk_knee_r"));
+  p.sketch("Outline_Sketch", "XY", 0, raw(shape.thighOutlineCmds()));
   p.extrude("Plate", "t_plate", { op: "new" });
   p.sketch("KneeAxle_Sketch", "XY", 0, (s) => s.point(0, neg("lt")));
   p.hole("KneeAxleHole", "KneeAxle_Sketch", { diameter: "axle_d" });
+  // standoffs: four behind the rod's band, one in front of it near the hip
   p.sketch("Standoff_Sketch", "XY", 0, (s) => {
-    s.point("lk_so_x1", neg("lk_so_z1"));
-    s.point("lk_so_x2", neg("lk_so_z2"));
+    for (const i of [1, 2, 3, 4]) s.point(neg("lk_so_x" + i), neg("lk_so_z" + i));
+    s.point("lk_so_x5", neg("lk_so_z5"));
   });
   p.hole("StandoffHoles", "Standoff_Sketch", { clearance: "M3", fit: "close" });
   p.sketch("KneeM3_Sketch", "XY", 0, kneeM3);
@@ -575,15 +580,24 @@ def("thigh_outer_plate_lk", { body: "ThighOuterPlateLk", part_number: "RP-112", 
   p.extrude("PilotHole", 0, { op: "cut", through: true });
 });
 
-// Frame: the thigh plate frame, filling the cavity from z = 0 to cav_lk. Only the front of the hip disc: the crank
-// and the rod sweep the rear half. Clamped by the four front knee actuator screws. A prism with through holes.
+// Frame: the thigh plate frame, filling the cavity from z = 0 to cav_lk. The part of the hip disc (plate_w) in front of
+// the crank and rod, trimmed to the plates' outline (the concave front edge), with a bore round the crank hub. Clamped by
+// the four front knee actuator screws. A prism with through holes: turned over, it serves both sides.
 def("hip_spacer_lk", { body: "HipSpacerLk", part_number: "RP-113", sym: { axis: "z", about: "cav_lk/2" },
   description: "Hip spacer, linkage knee, printed" }, (p) => {
-  p.sketch("Disc_Sketch", "XY", 0, (s) => s.circle(0, 0, "plate_w"));
-  p.extrude("Disc", "cav_lk", { op: "new" });
+  p.sketch("Outline_Sketch", "XY", 0, raw(shape.thighOutlineCmds()));
+  p.extrude("Blank", "cav_lk", { op: "new" });
   // holes first, while there is material at every point of the actuator pattern; the cuts then take the rear ones away
   p.sketch("KneeM3_Sketch", "XY", 0, kneeM3);
   p.hole("KneeM3", "KneeM3_Sketch", { clearance: "M3", depth: "cav_lk" });
+  // everything outside the hip disc: a frame round the whole plate with the disc as its hole
+  p.sketch("Disc_Sketch", "XY", 0, (s) => {
+    const r = s.rect(neg("plate_w/2 + 10"), neg("lt + lk_knee_r + 10"), "plate_w/2 + 10", "plate_w/2 + 10", "plate_w + 20", "lt + lk_knee_r + plate_w/2 + 20");
+    s.dist(r.right, "plate_w/2 + 10");
+    s.dist(r.top, "plate_w/2 + 10");
+    s.circle(0, 0, "plate_w");
+  });
+  p.extrude("OutsideDisc", 0, { op: "cut", through: true });
   p.sketch("Bore_Sketch", "XY", 0, (s) => s.circle(0, 0, "lk_sp_bore_d"));
   p.extrude("Bore", 0, { op: "cut", through: true });
   p.sketch("Rear_Sketch", "XY", 0, (s) => {
@@ -597,7 +611,7 @@ def("hip_spacer_lk", { body: "HipSpacerLk", part_number: "RP-113", sym: { axis: 
 // Frame: axis Z = the knee actuator axis, origin on the flange face, crank toward +Z (into the cavity), rod pin on +X.
 // Symmetric about its XZ plane (the flange pattern is too), so the same crank serves both sides.
 def("knee_crank", { body: "KneeCrank", part_number: "RP-114", sym: { axis: "y" },
-  description: "Knee crank, 6 mm aluminium, laser-cut, counterbored and tapped" }, (p) => {
+  description: "Knee crank, 5 mm aluminium, laser-cut, counterbored and tapped" }, (p) => {
   p.sketch("Hub_Sketch", "XY", 0, (s) => s.circle(0, 0, "crank_hub_d"));
   p.extrude("Hub", "crank_t", { op: "new" });
   p.sketch("Arm_Sketch", "XY", 0, (s) => s.slot([0, 0], ["lk_a", 0], "lk_a", "crank_arm_w"));
@@ -652,38 +666,142 @@ def("knee_axle_lk", { body: "KneeAxleLk", part_number: "RP-117", sym: { axis: "z
   p.extrude("Axle", "2*t_plate + cav_lk", { op: "new" });
 });
 
-// Frame: as the belt shank (origin on the knee axis at the cavity's inner face; X forward, Y down the shank,
-// Z outward). Hub across the cavity on two 688 bearings, blade on the inner side, lever straight up the shank
-// axis above the knee. The lever is a clevis: the rod end's ring sits in a slot between two cheeks.
-// Symmetric front to back, so the same part serves both sides (turned half a turn about the vertical).
-def("shank_lk", { body: "ShankLk", part_number: "RP-116", sym: { axis: "x" },
-  description: "Shank with knee lever, linkage knee, printed" }, (p) => {
-  p.sketch("Hub_Sketch", "XY", "hub_gap", (s) => s.circle(0, 0, "lk_hub_d"));
-  p.extrude("Hub", "cav_lk - 2*hub_gap", { op: "new" });
-  p.sketch("Blade_Sketch", "XY", "hub_gap", (s) => {
-    const r = s.rect(neg("blade_w/2"), 0, "blade_w/2", "ls", "blade_w", "ls");
-    s.dist(r.right, "blade_w/2");
-    s.on(r.bottom);
+// Frame: as the thigh plates but on the knee axis: XY plane, X forward, Y up (the shank straight down), foot at (0, -ls),
+// thickness along +Z. A band sh_w wide along the S-shaped centreline, and a top joining a round about the knee to a boss
+// round the lever pin. Flat with through features: the same plate is the inner and the outer one, and turned over it
+// serves the other side.
+def("shank_plate", { body: "ShankPlate", part_number: "RP-118", sym: { axis: "z", about: "t_plate/2" },
+  description: "Shank plate, 3 mm aluminium 5754-H22 or better, laser-cut, lever pin hole cut 4.8, reamed 5 H7" }, (p) => {
+  p.sketch("Band_Sketch", "XY", 0, raw(shape.shankBandCmds()));
+  p.extrude("Band", "t_plate", { op: "new" });
+  p.sketch("Top_Sketch", "XY", 0, raw(shape.shankTopCmds()));
+  p.extrude("Top", "t_plate");
+  // knee: the flanged bushing's seat
+  p.sketch("Bushing_Sketch", "XY", 0, (s) => s.point(0, 0));
+  p.hole("BushingSeat", "Bushing_Sketch", { diameter: "bush_od" });
+  // lever pin: the Chicago screw's dia 5 barrel, through both plates, the shims and the rod end's ball. Cut at dia 4.8
+  // (cs_d - ream_stock) and reamed to 5 H7, so the pin does not hammer the hole as the rod load reverses
+  p.sketch("LeverPin_Sketch", "XY", 0, (s) => {
+    const [x, y] = shape.pin().map((v) => Math.round(v * 1e4) / 1e4);
+    s.cmd("sketch.draw.dimensioned", { command: "sketch.line", params: { points: [[0, 0], [x, y]] }, dimensions: { length: "lk_b", angle: "90 deg + lk_ang" } });
+    s.cmd("sketch.construction", { curves: ["l1"] });
+    s.cmd("sketch.point", { point: [x, y] });
+    s.coincident("p1", "l1.end");
   });
-  p.extrude("Blade", "blade_t");
-  p.sketch("FootCore_Sketch", "XY", "-foot_in", (s) => s.circle(0, "ls", "foot_core_d"));
-  p.extrude("FootCore", "foot_core_w");
-  p.sketch("Lever_Sketch", "XY", "hub_gap", (s) => s.slot([0, 0], [0, neg("lk_b")], "lk_b", "lever_w"));
-  p.extrude("Lever", "cav_lk - 2*hub_gap");
-  p.sketch("Clevis_Sketch", "XY", `${ROD_Z} - re_ball_w/2`, (s) => {
-    const r = s.rect(neg("lever_w/2 + 2"), neg("lk_b + lever_w/2 + 2"), "lever_w/2 + 2", neg("lk_hub_d/2 + 1"),
-      "lever_w + 4", "lk_b + lever_w/2 + 1 - lk_hub_d/2");
-    s.dist(r.right, "lever_w/2 + 2");
-    s.dist(r.top, "lk_hub_d/2 + 1");
+  p.hole("LeverPin", "LeverPin_Sketch", { diameter: "cs_d - ream_stock" });
+  // spacers on the centreline, sh_so1 and sh_so2 along it from the knee: each point lies on its arc, at the matching
+  // straight-line distance from the knee (computed from the centreline)
+  p.sketch("Spacer_Sketch", "XY", 0, (s) => {
+    shape.centrelineCmds().forEach((c) => s.cmd(c.command, c.params));
+    const cl = shape.centreline();
+    ["sh_so1", "sh_so2"].forEach((k, i) => {
+      const { p: pt, seg } = cl.along(DIMS[k]);
+      const id = "p" + (i + 1), r4 = (v) => Math.round(v * 1e4) / 1e4;
+      s.cmd("sketch.point", { point: pt.map(r4) });
+      s.cmd("sketch.constraint.coincident", { a: id, b: seg === 1 ? "a1" : "a2" });
+      s.cmd("sketch.dimension", { entities: ["origin", id], value: r4(Math.hypot(pt[0], pt[1])) });
+    });
   });
-  p.extrude("ClevisSlot", "re_ball_w", { op: "cut" });
-  p.sketch("RodPin_Sketch", "XY", "cav_lk - hub_gap", (s) => s.point(0, neg("lk_b")));
-  p.hole("RodPin", "RodPin_Sketch", { clearance: "M5", depth: "cav_lk - 2*hub_gap" });
-  // knee axle bore with a 688 bearing seat at each end
-  p.sketch("Axle_Sketch", "XY", "cav_lk - hub_gap", (s) => s.point(0, 0));
-  p.hole("AxleBore", "Axle_Sketch", { diameter: "axle_bore_d", type: "counterbore", cb_diameter: "seat_d", cb_depth: "lk_seat" });
-  p.sketch("SeatIn_Sketch", "XY", "hub_gap", (s) => s.point(0, 0));
-  p.hole("BearingSeatIn", "SeatIn_Sketch", { diameter: "seat_d", depth: "lk_seat" });
+  p.hole("SpacerHoles", "Spacer_Sketch", { clearance: "M3", fit: "close" });
+  // foot bolt, through the plates and the foot core
+  p.sketch("FootBolt_Sketch", "XY", 0, (s) => s.point(0, neg("ls")));
+  p.hole("FootBolt", "FootBolt_Sketch", { clearance: "M4", fit: "close" });
+});
+
+// Frame: axis Z, from z = 0 to sh_gap. Between the shank plates at the knee, round the two bushings' sleeves.
+def("shank_tube", { body: "ShankTube", part_number: "RP-119", sym: { axis: "z", about: "sh_gap/2" },
+  description: "Knee spacer tube, 14 x 10 mm aluminium tube, cut to length" }, (p) => {
+  p.sketch("Tube_Sketch", "XY", 0, (s) => { s.circle(0, 0, "sh_tube_d"); s.circle(0, 0, "sh_tube_bore"); });
+  p.extrude("Tube", "sh_gap", { op: "new" });
+});
+
+def("standoff_m3x9", { body: "Standoff9", part_number: "SO-M3X9", bom_type: "purchased", sym: { axis: "z", about: "sh_gap/2" },
+  description: "Standoff M3 x 9, female-female" }, (p) => {
+  p.sketch("Standoff_Sketch", "XY", 0, (s) => s.circle(0, 0, "standoff_d"));
+  p.extrude("Standoff", "sh_gap", { op: "new" });
+  p.sketch("Thread_Sketch", "XY", "sh_gap", (s) => s.point(0, 0));
+  p.hole("Thread", "Thread_Sketch", { thread: "M3" });
+});
+
+// Frame: axis Z, the barrel from z = 0 (under its head) to cs_l, its head below z = 0, the screw head above cs_l.
+// The lever pin: barrel and screw as one body (the screw head seats on the barrel's end). Envelope: the hex sockets and
+// the M4 thread inside the barrel are not modelled. Round, so any plane through the axis is a mirror plane.
+def("chicago_screw_m4x15", { body: "ChicagoScrew", part_number: "SCR-CHI-M4X15", bom_type: "purchased", sym: { axis: "x" },
+  description: "Chicago screw (sex bolt) M4 x 15, barrel dia 5, low heads 8.5 x 1.8 and 8.3 x 1.7, steel" }, (p) => {
+  p.sketch("BarrelHead_Sketch", "XY", "-cs_h1", (s) => s.circle(0, 0, "cs_d1"));
+  p.extrude("BarrelHead", "cs_h1", { op: "new" });
+  p.sketch("Barrel_Sketch", "XY", 0, (s) => s.circle(0, 0, "cs_d"));
+  p.extrude("Barrel", "cs_l");
+  p.sketch("ScrewHead_Sketch", "XY", "cs_l", (s) => s.circle(0, 0, "cs_d2"));
+  p.extrude("ScrewHead", "cs_h2");
+});
+
+// Frame: axis Z, from z = 0 to shim_t. Between the rod-end ball and each shank plate, on the lever pin.
+def("shim_5x10", { body: "Shim", part_number: "DIN988-5X10X0.5", bom_type: "purchased", sym: { axis: "x" },
+  description: "Shim ring DIN 988, 5 x 10 x 0.5, steel" }, (p) => {
+  p.sketch("Shim_Sketch", "XY", 0, (s) => { s.circle(0, 0, "shim_d"); s.circle(0, 0, "cs_d"); });
+  p.extrude("Shim", "shim_t", { op: "new" });
+});
+
+// Frame: axis Z, flange from z = 0 to bush_fl_t, sleeve from there to bush_fl_t + bush_l. Turns on the knee axle; the
+// flange is the thrust washer between the shank plate and the thigh plate. Round, so any plane through the axis is a
+// mirror plane.
+def("bushing_0810f", { body: "Bushing", part_number: "BUSH-0810F", bom_type: "purchased", sym: { axis: "x" },
+  description: "Flanged plain bushing 8 x 10 mm, 15 mm flange, polymer (iglidur type; exact size to confirm)" }, (p) => {
+  p.sketch("Flange_Sketch", "XY", 0, (s) => { s.circle(0, 0, "bush_fl_d"); s.circle(0, 0, "axle_d"); });
+  p.extrude("Flange", "bush_fl_t", { op: "new" });
+  p.sketch("Sleeve_Sketch", "XY", "bush_fl_t", (s) => { s.circle(0, 0, "bush_od"); s.circle(0, 0, "axle_d"); });
+  p.extrude("Sleeve", "bush_l");
+});
+
+// The two slots that take the shank plates' ends in the foot core and the foot pad, one per plate, symmetric about the
+// part's mid-plane. Each is the plate's end with foot_slot_clr all round: near the foot the plate runs along its lower
+// arc (sh_r2, centre at (sh_r2, 0) in the foot frame), so the slot is that arc band, sh_w wide, closed by the round end
+// about the foot centre (a3, tangent to both edges) and cut off above the pad by a line (l1).
+const footSlotSketch = (s) => {
+  const R = DIMS.sh_r2, w = DIMS.sh_w / 2 + DIMS.foot_slot_clr, yt = DIMS.foot_pad_od / 2 + 5, r4 = (v) => Math.round(v * 1e4) / 1e4;
+  const up = (r) => [r4(R - Math.sqrt(r * r - yt * yt)), r4(yt)];
+  s.cmd("sketch.arc.center_point", { center: [R, 0], start: up(R - w), end: [w, 0] });         // a1, inner edge
+  s.cmd("sketch.arc.center_point", { center: [R, 0], start: up(R + w), end: [-w, 0] });        // a2, outer edge
+  s.cmd("sketch.arc.center_point", { center: [0, 0], start: [-w, 0], end: [w, 0] });           // a3, round end, under the foot centre
+  s.cmd("sketch.line", { points: ["a2.start", "a1.start"] });                                   // l1, across the top
+  s.coincident("a3.end", "a1.end");
+  s.coincident("a3.start", "a2.end");
+  s.coincident("a2.center", "a1.center");
+  s.hv("origin", "a1.center", "horizontal");
+  s.dim(["a1"], "sh_r2 - sh_w/2 - foot_slot_clr", "radius");
+  s.dim(["a3"], "sh_w/2 + foot_slot_clr", "radius");
+  s.cmd("sketch.constraint.tangent", { a: "a3", b: "a1" });
+  s.cmd("sketch.constraint.tangent", { a: "a3", b: "a2" });
+  s.cmd("sketch.constraint.horizontal_vertical", { line: "l1", mode: "horizontal" });
+  s.dist("l1", "foot_pad_od/2 + 5");
+};
+const footSlots = (p) => {
+  const slot = (name, z0) => {
+    p.sketch(name + "_Sketch", "XY", z0, footSlotSketch);
+    p.extrude(name, "t_plate + 2*foot_slot_clr", { op: "cut" });
+  };
+  slot("SlotIn", "foot_core_w/2 - sh_gap/2 - t_plate - foot_slot_clr");
+  slot("SlotOut", "foot_core_w/2 + sh_gap/2 - foot_slot_clr");
+};
+
+// Frame: axis Z across the leg, from z = 0 to foot_core_w, centred on the shank's mid-plane; the plates enter along +Y.
+// Printed (PETG or similar); bolted to the plates through its centre, inside the TPU pad.
+def("foot_core", { body: "FootCore", part_number: "RP-120", sym: { axis: "z", about: "foot_core_w/2" },
+  description: "Foot core, linkage leg, printed" }, (p) => {
+  p.sketch("Core_Sketch", "XY", 0, (s) => s.circle(0, 0, "foot_core_d"));
+  p.extrude("Core", "foot_core_w", { op: "new" });
+  footSlots(p);
+  p.sketch("Bolt_Sketch", "XY", "foot_core_w", (s) => s.point(0, 0));
+  p.hole("Bolt", "Bolt_Sketch", { clearance: "M4", fit: "close" });
+});
+
+// Frame: as the foot core. The TPU ring round it, with the same slots where the plates pass through.
+def("foot_pad_lk", { body: "FootPadLk", part_number: "RP-121", sym: { axis: "z", about: "foot_core_w/2" },
+  description: "Foot pad, linkage leg, printed TPU" }, (p) => {
+  p.sketch("Pad_Sketch", "XY", 0, (s) => { s.circle(0, 0, "foot_pad_od"); s.circle(0, 0, "foot_core_d"); });
+  p.extrude("Pad", "foot_core_w", { op: "new" });
+  footSlots(p);
 });
 
 // key -> { key, file, comp, sym, bom_type, part }

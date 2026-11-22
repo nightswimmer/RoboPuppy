@@ -55,6 +55,7 @@ Use a sketch whenever a feature's shape or position expresses a design decision.
 - **Keep separate groups in separate sketches and features,** even on the same face. Each group can then be edited, suppressed or re-patterned without touching the others. One sketch holding every hole on a face is as hard to edit as none.
 - **Use the tool's hole feature driven by the sketch points when it has one,** in preference to a plain extruded cut. The hole feature records clearance fit, thread, counterbore and countersink, which drawings and the BOM need. Use an extruded cut only for openings that are not fastener holes or when no hole feature exists.
 - **Mating patterns share one source.** When two parts bolt together, both patterns are driven by the same parameters or by the projected interface of the purchased component, never typed twice.
+- **Model a hole at the size it is cut, when a later operation finishes it.** A precision hole that is reamed after laser cutting or drilling (a pin or shaft fit such as 5 H7) is modelled undersize by a named allowance (for example `ream_stock`, 0.2 mm), so the cut file carries the right size and the workshop does not have to be told to change it. Write the finished size and fit in the part's description (for example "cut 4.8, reamed 5 H7") and in a comment at the hole. The pin then overlaps the hole by the allowance in clash checks; report that overlap as intended. Tapped holes are the exception: the hole feature's thread already records the tap drill.
 
 ## 4. Patterns and mirrors
 

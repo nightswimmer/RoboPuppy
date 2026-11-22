@@ -1,6 +1,6 @@
-// Assemblies: the single leg (cad/leg/leg.sc) and the whole robot (cad/robot/robot.sc), and the same two with the
-// linkage knee instead of the belt (leg_linkage.sc, robot_linkage.sc). The variants share every part but the thigh,
-// shank and knee drive.
+// Assemblies: the single leg and the whole robot with the linkage knee (cad/leg/leg_linkage.sc,
+// cad/robot/robot_linkage.sc; the main design), and the same two with the belt knee (leg.sc, robot.sc; frozen with its
+// 242 mm links). The variants share every part but the thigh, the lower leg and the knee drive.
 // Every part is a link to its own file in cad/parts/, so each unique part is one item in the BOM.
 // A leg is designed once, here, as three rigid modules (hip, thigh, lower leg). The right-hand
 // modules are the same part files in mirrored positions: each placement is the left-hand one
@@ -11,6 +11,7 @@
 // linked from a leg file.
 const parts = require("./parts");
 const linkage = require("./lib/linkage");
+const shape = require("./lib/legshape");
 const { P, val } = require("./lib/dsl");
 const { I, mul, tr, rz, ry, basis, reflect, assertRigid, flat12, isIdentity } = require("./lib/mat");
 
@@ -88,18 +89,19 @@ const THIGH = [
   [parts.robstride02, MOTOR_KNEE],
   [parts.hip_pulley, AX_Y([0, Y_BELT0, 0])],
   ...STANDOFFS.map(([x, z]) => [parts.standoff_m3x35, AX_Y([x, Y_CAV0, z])]),
-  [parts.knee_axle, AX_Y([0, P.y_in, -P.lt])],
+  [parts.knee_axle, AX_Y([0, P.y_in, -P.lt_belt])],
   ...[0, 1, 2].map((k) => [parts.bearing_625, AX_Y([-P.idl_x, Y_BELT0 + (P.pulley_w - 15) / 2 + 5 * k, -P.idl_z])]),
   [parts.idler_bolt_m5, AX_Y([-P.idl_x, P.y_in, -P.idl_z])],
 ];
 const LOWER = [
-  [parts.shank, AX_Y([0, Y_CAV0, -P.lt])],
-  [parts.foot_pad, AX_Y([0, Y_CAV0 - P.foot_in, -P.lt - P.ls])],
+  [parts.shank, AX_Y([0, Y_CAV0, -P.lt_belt])],
+  [parts.foot_pad, AX_Y([0, Y_CAV0 - P.foot_in, -P.lt_belt - P.ls_belt])],
 ];
 const LIMITS = { abd: [-45, 45], hip: [-120, 120], knee: [-145, 0] };
 
-// ---- linkage knee variant: the knee actuator turns a crank; a pushrod runs down the rear of the thigh to a
-// lever on the shank above the knee axis. Narrower cavity, tapered plates. Hip and torso as the belt leg. ----
+// ---- linkage knee (the main design): the knee actuator turns a crank; a pushrod runs down the rear of the thigh to the
+// lever pin at the top of the shank. Narrower cavity, hook-shaped thigh plates, a shank of two S-shaped plates. Hip and
+// torso as the belt leg. ----
 const Y_OUT_LK = Y_CAV0 + P.cav_lk;                               // 65: outer plate inner face
 const Y_K_LK = Y_OUT_LK + P.t_plate;                              // 68: knee actuator front face
 const Y_CRANK = Y_OUT_LK - (P.rs_flange_h - P.t_plate);           // 64: knee actuator flange face = crank's outer face
@@ -110,14 +112,41 @@ const THIGH_LK = [
   [parts.thigh_outer_plate_lk, PLATE(Y_K_LK)],
   [parts.hip_spacer_lk, PLATE(Y_OUT_LK)],
   [parts.robstride02, MOTOR_KNEE_LK],
-  ...[[P.lk_so_x1, -P.lk_so_z1], [P.lk_so_x2, -P.lk_so_z2]].map(([x, z]) => [parts.standoff_m3x20, AX_Y([x, Y_CAV0, z])]),
+  ...[1, 2, 3, 4, 5].map((i) => [parts.standoff_m3x20, AX_Y([i < 5 ? -P["lk_so_x" + i] : P["lk_so_x" + i], Y_CAV0, -P["lk_so_z" + i]])]),
   [parts.knee_axle_lk, AX_Y([0, P.y_in, -P.lt])],
 ];
+// Lower leg: the two shank plates (sh_in inside the thigh plates, sh_gap apart), the tube and two spacers between them, a
+// flanged bushing in each plate (flange outward, against the thigh plate), the foot core and pad on the plate ends, and
+// the lever pin: a Chicago screw through both plates and the rod-end ball, with a shim each side of the ball (the barrel
+// head inward, the screw head outward).
+// The S-shaped plates are not symmetric front to back, so the right-hand lower leg is the mirror module (same parts).
+const Y_SH0 = Y_CAV0 + P.sh_in;                                   // 47.5: inner shank plate's inner face
+const Y_GAP = Y_SH0 + P.t_plate;                                  // 50.5: between the plates, to Y_GAP + sh_gap
+const Y_SH1 = Y_GAP + P.sh_gap + P.t_plate;                       // 62.5: outer shank plate's outer face
+const [PIN_X, PIN_Z] = shape.pin();                               // lever pin, from the knee in the leg plane
+const close = (a, b) => Math.abs(a - b) < 1e-9;
+if (!close(P.cs_l, 2 * P.t_plate + P.sh_gap)) throw new Error("the Chicago screw's barrel (cs_l) must equal the shank stack (2*t_plate + sh_gap)");
+if (!close(P.re_ball_w + 2 * P.shim_t, P.sh_gap)) throw new Error("the rod-end ball and its two shims (re_ball_w + 2*shim_t) must fill sh_gap");
+if (!close(Y_ROD, Y_GAP + P.sh_gap / 2)) throw new Error("the rod plane (set by the crank) must be the mid-plane between the shank plates");
+const KNEE_PLATE = (y) => mul(tr(0, 0, -P.lt), PLATE(y));
+const CL = shape.centreline();
+const FOOT_UP = (CL.footUp * Math.PI) / 180;                      // the plates' direction where they enter the foot
+const FOOT = basis([-Math.sin(FOOT_UP), 0, Math.cos(FOOT_UP)], [Math.cos(FOOT_UP), 0, Math.sin(FOOT_UP)], [0, 1, 0],
+  [0, Y_GAP + P.sh_gap / 2 - P.foot_core_w / 2, -P.lt - P.ls]);
 const LOWER_LK = [
-  [parts.shank_lk, AX_Y([0, Y_CAV0, -P.lt])],
-  [parts.foot_pad, AX_Y([0, Y_CAV0 - P.foot_in, -P.lt - P.ls])],
+  [parts.shank_plate, KNEE_PLATE(Y_GAP)],
+  [parts.shank_plate, KNEE_PLATE(Y_SH1)],
+  [parts.shank_tube, AX_Y([0, Y_GAP, -P.lt])],
+  ...[P.sh_so1, P.sh_so2].map((d) => { const [x, z] = CL.along(d).p; return [parts.standoff_m3x9, AX_Y([x, Y_GAP, z - P.lt])]; }),
+  [parts.bushing_0810f, AX_Y([0, Y_SH0 - P.bush_fl_t, -P.lt])],
+  [parts.bushing_0810f, basis([1, 0, 0], [0, 0, 1], [0, -1, 0], [0, Y_SH1 + P.bush_fl_t, -P.lt])],
+  [parts.chicago_screw_m4x15, AX_Y([PIN_X, Y_SH0, PIN_Z - P.lt])],
+  [parts.shim_5x10, AX_Y([PIN_X, Y_GAP, PIN_Z - P.lt])],
+  [parts.shim_5x10, AX_Y([PIN_X, Y_GAP + P.sh_gap - P.shim_t, PIN_Z - P.lt])],
+  [parts.foot_core, FOOT],
+  [parts.foot_pad_lk, FOOT],
 ];
-const LIMITS_LK = { abd: LIMITS.abd, hip: LIMITS.hip, knee: [-140, -45] };   // knee: where the linkage transmits well
+const LIMITS_LK = { abd: LIMITS.abd, hip: LIMITS.hip, knee: [-159, -60] };   // knee fold 60-159 (the foot meets the hip at 159.8)
 
 // Crank and pushrod placed for knee fold q (in the leg frame, hip pitch 0), and their pin centres A and B.
 const linkageAt = (q) => {
@@ -135,24 +164,25 @@ const linkageAt = (q) => {
     ],
   };
 };
-const STAND = { hip: 35, knee: -70 };
-const LK_POSE = linkageAt(-STAND.knee);
+const STAND = { hip: 35, knee: -70 };          // belt robot
+const STAND_LK = { hip: 45.8, knee: -85.9 };   // linkage robot: the Unitree Go2's standing pose (hip 0.8 rad, knee -1.5 rad)
+const LK_POSE = linkageAt(-STAND_LK.knee);
 
 // The two designs. The linkage modules are built in the standing pose, where its loop closes.
 const VARIANTS = {
-  belt: { thigh: THIGH, lower: LOWER, limits: LIMITS,
+  belt: { thigh: THIGH, lower: LOWER, limits: LIMITS, lt: P.lt_belt, stand: STAND,
     leg: "cad/leg/leg.sc", legBom: "cad/leg/leg_bom.csv", robot: "cad/robot/robot.sc", bom: "cad/robot/bom.csv" },
-  linkage: { thigh: THIGH_LK, lower: LOWER_LK, limits: LIMITS_LK, linkage: LK_POSE,
+  linkage: { thigh: THIGH_LK, lower: LOWER_LK, limits: LIMITS_LK, linkage: LK_POSE, lt: P.lt, stand: STAND_LK, handedLower: true,
     leg: "cad/leg/leg_linkage.sc", legBom: "cad/leg/leg_linkage_bom.csv", robot: "cad/robot/robot_linkage.sc", bom: "cad/robot/bom_linkage.csv" },
 };
 
 // Joints of one leg whose hip is at world [hx, side*abd_y, 0]. Positive abduction is outward on both
 // sides; hip and knee turn about +Y on both sides, so equal angles give mirror-image poses.
-const legJoints = (asm, id, torso, occ, hx, sx, sy, limits) => {
+const legJoints = (asm, id, torso, occ, hx, sx, sy, limits, lt) => {
   const y = (ly) => sy * (P.abd_y + ly);
   asm.joint("HipAbduction_" + id, torso, occ.hip, [hx - sx * P.flange_x, y(0), 0], [sy, 0, 0], limits.abd);
   asm.joint("HipPitch_" + id, occ.hip, occ.thigh, [hx, y(P.y_in), 0], [0, 1, 0], limits.hip);
-  asm.joint("Knee_" + id, occ.thigh, occ.lower, [hx, y(Y_CAV0 + 7), -P.lt], [0, 1, 0], limits.knee);
+  asm.joint("Knee_" + id, occ.thigh, occ.lower, [hx, y(Y_CAV0 + 7), -lt], [0, 1, 0], limits.knee);
 };
 
 // The knee linkage's loop, made once the knee stands where the crank and rod were placed: crank on the knee
@@ -173,13 +203,13 @@ function legAsm(v) {
   const torso = asm.comp("Torso");
   asm.place(parts.bulkhead, "Torso", basis([0, 1, 0], [0, 0, 1], [1, 0, 0], [P.x_bulk, 0, 0]));
   asm.place(parts.robstride02, "Torso", mul(hip, MOTOR_ABD));
-  const occ = { hip: buildModule(asm, "Hip_A", HIP), thigh: buildModule(asm, "Thigh_L", v.thigh), lower: buildModule(asm, "LowerLeg", v.lower) };
+  const occ = { hip: buildModule(asm, "Hip_A", HIP), thigh: buildModule(asm, "Thigh_L", v.thigh), lower: buildModule(asm, v.handedLower ? "LowerLeg_L" : "LowerLeg", v.lower) };
   if (v.linkage) Object.assign(occ, { crank: buildModule(asm, "KneeCrank_L", v.linkage.crank), rod: buildModule(asm, "KneeRod_L", v.linkage.rod) });
   for (const o of Object.values(occ)) asm.move(o, hip);
   asm.lock();
-  legJoints(asm, "FL", torso, occ, P.hip_x, 1, 1, v.limits);
+  legJoints(asm, "FL", torso, occ, P.hip_x, 1, 1, v.limits, v.lt);
   if (v.linkage) {
-    drive(asm, "Knee_FL", STAND.knee);
+    drive(asm, "Knee_FL", v.stand.knee);
     linkageJoints(asm, "FL", occ, P.hip_x, 1, v.linkage);
   }
   asm.cmd("assembly.bom", { path: v.legBom });
@@ -247,7 +277,8 @@ function robotAsm(v) {
   // legs: each module is defined once per hand and placed twice
   const hipA = buildModule(asm, "Hip_A", HIP), hipB = buildModule(asm, "Hip_B", HIP, MY);
   const thighL = buildModule(asm, "Thigh_L", v.thigh), thighR = buildModule(asm, "Thigh_R", v.thigh, MY);
-  const lower = buildModule(asm, "LowerLeg", v.lower);
+  const lower = buildModule(asm, v.handedLower ? "LowerLeg_L" : "LowerLeg", v.lower);
+  const lowerR = v.handedLower ? buildModule(asm, "LowerLeg_R", v.lower, MY) : null;
   const at = (sx, sy) => tr(sx * P.hip_x, sy * P.abd_y, 0);
   const turned = mul(rz(180));
   const legs = {
@@ -261,13 +292,14 @@ function robotAsm(v) {
   asm.move(thighL, at(1, 1));
   asm.move(thighR, at(1, -1));
   asm.move(lower, at(1, 1));
-  legs.FR.lower = asm.copy("LowerLeg", mul(at(1, -1), turned));          // symmetric front to back: half a turn serves the right side
+  if (lowerR) asm.move(lowerR, at(1, -1));
+  legs.FR.lower = lowerR || asm.copy("LowerLeg", mul(at(1, -1), turned));   // belt: symmetric front to back, half a turn serves the right side
   legs.RL.hip = asm.copy("Hip_B", mul(turned, at(1, -1)));               // rear hips are the opposite front hips turned half a turn
   legs.RL.thigh = asm.copy("Thigh_L", at(-1, 1));
-  legs.RL.lower = asm.copy("LowerLeg", at(-1, 1));
+  legs.RL.lower = asm.copy(lowerR ? "LowerLeg_L" : "LowerLeg", at(-1, 1));
   legs.RR.hip = asm.copy("Hip_A", mul(turned, at(1, 1)));
   legs.RR.thigh = asm.copy("Thigh_R", at(-1, -1));
-  legs.RR.lower = asm.copy("LowerLeg", mul(at(-1, -1), turned));
+  legs.RR.lower = lowerR ? asm.copy("LowerLeg_R", at(-1, -1)) : asm.copy("LowerLeg", mul(at(-1, -1), turned));
   if (v.linkage) {
     // crank and pushrod: one module per hand, the right-hand one the same parts in mirrored positions
     const crankL = buildModule(asm, "KneeCrank_L", v.linkage.crank), crankR = buildModule(asm, "KneeCrank_R", v.linkage.crank, MY);
@@ -282,11 +314,11 @@ function robotAsm(v) {
     Object.assign(legs.RR, { crank: asm.copy("KneeCrank_R", at(-1, -1)), rod: asm.copy("KneeRod_R", at(-1, -1)) });
   }
   asm.lock();
-  for (const [id, l] of Object.entries(legs)) legJoints(asm, id, torso, l, l.sx * P.hip_x, l.sx, l.sy, v.limits);
+  for (const [id, l] of Object.entries(legs)) legJoints(asm, id, torso, l, l.sx * P.hip_x, l.sx, l.sy, v.limits, v.lt);
   if (v.linkage) {
     // the knees go to the standing pose first, where the crank and rod were placed; then the loops are closed
     for (const [id, l] of Object.entries(legs)) {
-      drive(asm, "Knee_" + id, STAND.knee);
+      drive(asm, "Knee_" + id, v.stand.knee);
       linkageJoints(asm, id, l, l.sx * P.hip_x, l.sy, v.linkage);
     }
   }
@@ -294,8 +326,8 @@ function robotAsm(v) {
   asm.cmd("assembly.bom", { path: v.bom });
   // standing pose
   for (const id of Object.keys(legs)) {
-    drive(asm, "HipPitch_" + id, STAND.hip);
-    drive(asm, "Knee_" + id, STAND.knee);
+    drive(asm, "HipPitch_" + id, v.stand.hip);
+    drive(asm, "Knee_" + id, v.stand.knee);
   }
   return asm;
 }

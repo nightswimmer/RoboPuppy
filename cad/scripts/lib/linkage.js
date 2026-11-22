@@ -3,10 +3,10 @@
 // shank axis above the knee, turned by dl degrees (positive toward the rear), so it is roughly opposite the
 // shank; the pushrod (c) joins the two pins.
 // q is the knee fold in degrees (0 = straight leg; the knee joint's value is -q).
-// g overrides the geometry ({a, b, c, dl, lt}); by default it is the one in dims.js (dl = 0).
+// g overrides the geometry ({a, b, c, dl, lt}); by default it is the one in dims.js (dl = lk_ang).
 const P = require("../dims");
 const rad = (d) => (d * Math.PI) / 180, deg = (r) => (r * 180) / Math.PI;
-const DEFAULT = { a: P.lk_a, b: P.lk_b, c: P.lk_c, dl: 0, lt: P.lt };
+const DEFAULT = { a: P.lk_a, b: P.lk_b, c: P.lk_c, dl: P.lk_ang, lt: P.lt };
 
 function knee(q, g = {}) {
   const { a, b, c, dl, lt } = Object.assign({}, DEFAULT, g);

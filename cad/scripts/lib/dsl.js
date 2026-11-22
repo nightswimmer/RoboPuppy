@@ -159,7 +159,7 @@ class Part {
   script() {
     const text = JSON.stringify(this.cmds);
     const used = KEYS.filter((k) => new RegExp(`\\b${k}\\b`).test(text));
-    const params = used.map((k) => ({ command: "parameters.add", params: { name: k, expression: P[k] + " mm" } }));
+    const params = used.map((k) => ({ command: "parameters.add", params: { name: k, expression: P[k] + (/_ang$/.test(k) ? " deg" : " mm") } }));
     const meta = { part_number: this.part_number, description: this.description };
     return { commands: [...params, ...this.cmds,
       { command: "document.metadata.set", params: { values: meta } },

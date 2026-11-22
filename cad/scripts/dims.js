@@ -22,8 +22,12 @@ module.exports = {
   horn_d: 22, horn_t: 3,
 
   // ---- leg ----
-  lt: 242.2,             // thigh: hip axis to knee axis (HTD 5M 635 belt, 24T:36T)
-  ls: 242,               // shank: knee axis to foot centre
+  // Link lengths. lt and ls are the main design (the linkage leg, close to the Unitree Go2's 213/213). The belt variant
+  // is frozen at its own lengths, which its belt sets.
+  lt: 200,               // thigh: hip axis to knee axis
+  ls: 200,               // shank: knee axis to foot centre
+  lt_belt: 242.2,        // belt variant thigh (HTD 5M 635 belt, 24T:36T)
+  ls_belt: 242,          // belt variant shank
   t_plate: 3,            // thigh plates
   plate_w: 84,           // thigh plate width
   y_h: 10,               // hip-pitch actuator rear annulus, from the abduction axis
@@ -54,20 +58,49 @@ module.exports = {
   axle_bore_d: 10, seat_d: 16, seat_out: 4.6, seat_in: 5.1,
   foot_pad_od: 56,
 
-  // ---- leg, linkage knee variant (leg_linkage.sc, robot_linkage.sc) ----
-  // The knee actuator turns a crank; a pushrod runs down the thigh to a lever on the shank (a four-bar).
-  // Knee fold range 45-140 deg; ratio 1.42:1 standing, at least 1.29:1 everywhere, rising toward both ends.
-  cav_lk: 20,            // cavity between the plates (M3 x 20 standoffs)
-  lk_knee_r: 18,         // plate end radius at the knee; the hip end keeps plate_w/2
-  lk_a: 26,              // crank: knee actuator axis to rod pin
-  lk_b: 34,              // shank lever: knee axis to rod pin, along the shank axis above the knee
-  lk_c: 244.2,           // pushrod: rod-end ball centre to ball centre
-  crank_t: 6, crank_hub_d: 40, crank_arm_w: 13, crank_cb_d: 8, crank_cb_depth: 3,   // 6 mm aluminium crank, counterbored M4
+  // ---- leg, linkage knee (the main design: leg_linkage.sc, robot_linkage.sc; first designed in the motion rig) ----
+  // The knee actuator turns a crank; a pushrod runs down the rear of the thigh to a lever on the shank (a four-bar).
+  // Knee fold 60-159 deg (at 159.8 the foot pad meets the thigh's hip end). Ratio 1.38 in the Go2 stance, 1.27-1.38 over
+  // the trotting folds (86-105), at least 1.25, about 3.0 at 60 and 2.1 at 159; transmission angles at least 18 deg.
+  // Keys ending in _ang are angles (degrees); the others are lengths.
+  cav_lk: 20,            // cavity between the thigh plates (M3 x 20 standoffs)
+  lk_a: 22,              // crank: knee actuator axis to rod pin
+  lk_b: 28,              // shank lever: knee axis to the lever pin
+  lk_ang: -12,           // lever pin direction: from the shank axis above the knee, turned this far (positive toward the rear)
+  lk_c: 203,             // pushrod: rod-end ball centre to ball centre (lt + 3)
+  crank_t: 5, crank_hub_d: 40, crank_arm_w: 13, crank_cb_d: 8, crank_cb_depth: 3,   // 5 mm aluminium crank, counterbored M4
   re_d: 18, re_t: 6, re_ball_d: 11, re_ball_w: 8, re_neck_d: 7, re_neck: 14, re_bore_d: 5,   // M5 male rod end (SA5 T/K size), envelope
   rod_d: 8, rod_bore_d: 4, rod_end_gap: 18, rod_thread: 15,   // pushrod: 8 x 4 mm 6061 tube, the bore opened to the M5 tap drill at each end; it starts rod_end_gap from each ball centre (rod-end neck + jam nut)
-  lk_hub_d: 24, lever_w: 20, lk_seat: 5,       // shank hub, lever width, 688 bearing seat depth at each end
+  // thigh plates: a hook. Hip round plate_w/2 and knee round lk_knee_r; the rear edge is two convex arcs (nearly straight
+  // from the hip, then a tighter one into the knee round), the front edge two concave arcs (a long one from the hip round,
+  // then a tight one into the knee round), so the bend is near the knee and the folded shank nests in front of it.
+  // The junctions are th_rear_j and th_front_j times lt below the hip (ratios). The front edge stays at least 1.5 mm in
+  // front of the rod at every fold.
+  lk_knee_r: 20,
+  th_rear_r1: 1200, th_rear_r2: 230, th_front_r1: 210, th_front_r2: 40, th_rear_j: 0.4, th_front_j: 0.75,
+  // thigh standoffs (M3 x 20), x and depth below the hip axis: four behind the rod (x toward the rear), one in front near the hip
+  lk_so_x1: 40, lk_so_z1: 45, lk_so_x2: 41, lk_so_z2: 85, lk_so_x3: 39, lk_so_z3: 120, lk_so_x4: 36, lk_so_z4: 145,
+  lk_so_x5: 3.5, lk_so_z5: 55,
   lk_sp_bore_d: 44, lk_sp_x0: 8,               // hip spacer: bore around the crank hub; rear edge clear of the crank and rod
-  lk_so_x1: 26, lk_so_z1: 95, lk_so_x2: 15, lk_so_z2: 185,   // standoffs, all in the front half (the rod runs at the rear)
+  // shank: two 3 mm aluminium plates, sh_w wide, along an S-shaped centreline: a line sh_lean_l long from the knee
+  // leaning sh_lean_ang toward the rear, an arc (sh_r1) turning toward the front, then an arc (sh_r2) turning back that
+  // ends at the foot, under the knee. The plate top is a round (sh_top_r) about the knee joined to a boss (sh_boss_r)
+  // round the lever pin.
+  sh_w: 26, sh_lean_ang: 4, sh_lean_l: 15, sh_r1: 150, sh_r2: 175, sh_top_r: 16, sh_boss_r: 11,
+  sh_in: 2.5,            // inner shank plate, from the cavity's inner face (the plates run sh_in inside the thigh plates;
+                         // the Chicago screw heads pass under the thigh plates there, from about 60 to 105 deg of knee fold)
+  sh_gap: 9,             // between the shank plates: the rod-end ball (re_ball_w) and a shim each side (shim_t)
+  sh_so1: 55, sh_so2: 125,                     // shank spacers (M3 x 9), along the centreline from the knee (arc lengths)
+  // lever pin: a Chicago screw (sex bolt) M4 x 15 through both shank plates, the shims and the rod-end ball. Barrel
+  // dia cs_d, cs_l long under its head (= 2*t_plate + sh_gap); barrel head cs_d1 x cs_h1, screw head cs_d2 x cs_h2.
+  cs_d: 5, cs_l: 15, cs_d1: 8.5, cs_h1: 1.8, cs_d2: 8.3, cs_h2: 1.7,
+  shim_d: 10, shim_t: 0.5,                     // DIN 988 shim 5 x 10 x 0.5 each side of the rod-end ball
+  // holes finished by reaming are modelled at the size they are cut (laser or drill): ream_stock under the finished
+  // size, so the cut file carries the right size and the reamer has material to remove
+  ream_stock: 0.2,
+  sh_tube_d: 14, sh_tube_bore: 10,             // spacer tube between the shank plates, round the knee bushings
+  bush_od: 10, bush_l: 5, bush_fl_d: 15, bush_fl_t: 1,   // flanged plain bushing 8 x 10 in each shank plate, flange toward the thigh plate
+  foot_slot_clr: 0.2,    // foot core and pad: clearance round the plate ends in their slots
 
   // ---- torso ----
   hip_x: 210,            // hip pitch axes, fore/aft from centre
