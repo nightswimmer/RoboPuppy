@@ -169,4 +169,40 @@ function shankTopCmds() {
   ];
 }
 
-module.exports = { thighOutline, thighOutlineCmds, centreline, centrelineCmds, shankBandCmds, shankTopCmds, pin, v2, unit2 };
+// ---- knee hub (printed, between the shank plates; shank plate frame, centred on the knee axis) ----
+// Body: a round kh_d across, cut back to kh_rel_r between kh_rel0_ang and kh_rel1_ang (0 = forward, 90 = up), where the
+// pushrod passes close to the knee at deep folds. Construction lines l1/l2 (kh_rel_r long) set the relief's ends; a1 is
+// the round, a2 the relief, l3/l4 the radial steps between them (collinear with l2/l1).
+function kneeHubCmds() {
+  const R = P.kh_d / 2, r = P.kh_rel_r, a0 = (P.kh_rel0_ang * Math.PI) / 180, a1 = (P.kh_rel1_ang * Math.PI) / 180;
+  const at = (rr, a) => [r4(rr * Math.cos(a)), r4(rr * Math.sin(a))];
+  const ray = (a, ang) => c("sketch.draw.dimensioned", { command: "sketch.line", params: { points: [[0, 0], at(r, a)] }, dimensions: { length: "kh_rel_r", angle: ang } });
+  return [
+    ray(a0, "kh_rel0_ang"), c("sketch.construction", { curves: ["l1"] }),
+    ray(a1, "kh_rel1_ang"), c("sketch.construction", { curves: ["l2"] }),
+    c("sketch.arc.center_point", { center: [0, 0], start: at(R, a1), end: at(R, a0) }),   // a1, the round (the long way)
+    c("sketch.arc.center_point", { center: [0, 0], start: at(r, a0), end: at(r, a1) }),   // a2, the relief
+    c("sketch.line", { points: ["a2.end", "a1.start"] }),                                 // l3
+    c("sketch.line", { points: ["a1.end", "a2.start"] }),                                 // l4
+    c("sketch.constraint.coincident", { a: "a2.start", b: "l1.end" }),
+    c("sketch.constraint.coincident", { a: "a2.end", b: "l2" }),
+    c("sketch.dimension", { entities: ["a1"], value: "kh_d/2", type: "radius" }),
+    c("sketch.constraint.coincident", { a: "l3", b: "l2" }),
+    c("sketch.constraint.coincident", { a: "l4", b: "l1" }),
+  ];
+}
+
+// The hub's D-shaped spigot, and the matching hole in each shank plate (one source for both): a round kh_key_d across
+// with a flat kh_key behind the axis, so the hub cannot turn in the plates and its relief stays toward the rod.
+function kneeKeyCmds() {
+  const R = P.kh_key_d / 2, h = Math.sqrt(R * R - P.kh_key * P.kh_key);
+  return [
+    c("sketch.arc.center_point", { center: [0, 0], start: [-P.kh_key, r4(-h)], end: [-P.kh_key, r4(h)] }),   // a1, round the front
+    c("sketch.line", { points: ["a1.end", "a1.start"] }),                                                    // l1, the flat
+    c("sketch.dimension", { entities: ["a1"], value: "kh_key_d/2", type: "radius" }),
+    c("sketch.constraint.horizontal_vertical", { points: ["l1.start", "l1.end"], mode: "vertical" }),
+    c("sketch.dimension", { entities: ["origin", "l1"], value: "kh_key" }),
+  ];
+}
+
+module.exports = { thighOutline, thighOutlineCmds, centreline, centrelineCmds, shankBandCmds, shankTopCmds, kneeHubCmds, kneeKeyCmds, pin, v2, unit2 };

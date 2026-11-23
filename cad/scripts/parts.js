@@ -552,8 +552,10 @@ const raw = (cmds) => (s) => cmds.forEach((c) => s.cmd(c.command, c.params));
 const thighPlateLk = (p) => {
   p.sketch("Outline_Sketch", "XY", 0, raw(shape.thighOutlineCmds()));
   p.extrude("Plate", "t_plate", { op: "new" });
+  // knee: the Chicago screw's dia 5 barrel, which clamps the knee sleeve between the plates. Cut at dia 4.8
+  // (cs_d - ream_stock) and reamed to 5 H7
   p.sketch("KneeAxle_Sketch", "XY", 0, (s) => s.point(0, neg("lt")));
-  p.hole("KneeAxleHole", "KneeAxle_Sketch", { diameter: "axle_d" });
+  p.hole("KneeAxleHole", "KneeAxle_Sketch", { diameter: "cs_d - ream_stock" });
   // standoffs: four behind the rod's band, one in front of it near the hip
   p.sketch("Standoff_Sketch", "XY", 0, (s) => {
     for (const i of [1, 2, 3, 4]) s.point(neg("lk_so_x" + i), neg("lk_so_z" + i));
@@ -565,7 +567,7 @@ const thighPlateLk = (p) => {
 };
 
 def("thigh_inner_plate_lk", { body: "ThighInnerPlateLk", part_number: "RP-111", sym: { axis: "z", about: "t_plate/2" },
-  description: "Thigh inner plate, linkage knee, 3 mm aluminium, laser-cut" }, (p) => {
+  description: "Thigh inner plate, linkage knee, 3 mm aluminium, laser-cut, knee hole cut 4.8, reamed 5 H7" }, (p) => {
   thighPlateLk(p);
   p.sketch("FlangeM4_Sketch", "XY", 0, (s) => s.pattern([s.point("rs_flange_bcd/2", 0)], "origin", 6));
   p.hole("FlangeM4", "FlangeM4_Sketch", { clearance: "M4", fit: "close" });
@@ -574,7 +576,7 @@ def("thigh_inner_plate_lk", { body: "ThighInnerPlateLk", part_number: "RP-111", 
 });
 
 def("thigh_outer_plate_lk", { body: "ThighOuterPlateLk", part_number: "RP-112", sym: { axis: "z", about: "t_plate/2" },
-  description: "Thigh outer plate, linkage knee, 3 mm aluminium, laser-cut" }, (p) => {
+  description: "Thigh outer plate, linkage knee, 3 mm aluminium, laser-cut, knee hole cut 4.8, reamed 5 H7" }, (p) => {
   thighPlateLk(p);
   p.sketch("Pilot_Sketch", "XY", 0, (s) => s.circle(0, 0, "pilot_clear_d"));
   p.extrude("PilotHole", 0, { op: "cut", through: true });
@@ -660,10 +662,12 @@ def("standoff_m3x20", { body: "Standoff20", part_number: "SO-M3X20", bom_type: "
   p.hole("Thread", "Thread_Sketch", { thread: "M3" });
 });
 
-def("knee_axle_lk", { body: "KneeAxleLk", part_number: "RP-117", sym: { axis: "z", about: "(2*t_plate + cav_lk)/2" },
-  description: "Knee axle, linkage knee, dia 8 steel, ends tapped" }, (p) => {
-  p.sketch("Axle_Sketch", "XY", 0, (s) => s.circle(0, 0, "axle_d"));
-  p.extrude("Axle", "2*t_plate + cav_lk", { op: "new" });
+// Frame: axis Z, from z = 0 to cav_lk. The knee axle: a hardened sleeve clamped between the thigh plates' inner faces by
+// the knee Chicago screw; the needle bearing runs on it. Round, so any plane through the axis is a mirror plane.
+def("knee_sleeve", { body: "KneeSleeve", part_number: "SLEEVE-5X8X20", bom_type: "purchased", sym: { axis: "x" },
+  description: "Knee sleeve 5 x 8 x 20, bearing steel quenched 58-62 HRC, OD ground 8 0/-0.01 (the needle raceway); length checked against the thigh plate gap" }, (p) => {
+  p.sketch("Sleeve_Sketch", "XY", 0, (s) => { s.circle(0, 0, "axle_d"); s.circle(0, 0, "cs_d"); });
+  p.extrude("Sleeve", "cav_lk", { op: "new" });
 });
 
 // Frame: as the thigh plates but on the knee axis: XY plane, X forward, Y up (the shank straight down), foot at (0, -ls),
@@ -671,14 +675,14 @@ def("knee_axle_lk", { body: "KneeAxleLk", part_number: "RP-117", sym: { axis: "z
 // round the lever pin. Flat with through features: the same plate is the inner and the outer one, and turned over it
 // serves the other side.
 def("shank_plate", { body: "ShankPlate", part_number: "RP-118", sym: { axis: "z", about: "t_plate/2" },
-  description: "Shank plate, 3 mm aluminium 5754-H22 or better, laser-cut, lever pin hole cut 4.8, reamed 5 H7" }, (p) => {
+  description: "Shank plate, 3 mm aluminium 5754-H22 or better, laser-cut, lever pin hole cut 4.8, reamed 5 H7, D-shaped knee hole for the printed hub" }, (p) => {
   p.sketch("Band_Sketch", "XY", 0, raw(shape.shankBandCmds()));
   p.extrude("Band", "t_plate", { op: "new" });
   p.sketch("Top_Sketch", "XY", 0, raw(shape.shankTopCmds()));
   p.extrude("Top", "t_plate");
-  // knee: the flanged bushing's seat
-  p.sketch("Bushing_Sketch", "XY", 0, (s) => s.point(0, 0));
-  p.hole("BushingSeat", "Bushing_Sketch", { diameter: "bush_od" });
+  // knee: the D-shaped hole the knee hub's spigot sits in (same outline as the spigot); the flat keys the hub
+  p.sketch("KneeKey_Sketch", "XY", 0, raw(shape.kneeKeyCmds()));
+  p.extrude("KneeKey", 0, { op: "cut", through: true });
   // lever pin: the Chicago screw's dia 5 barrel, through both plates, the shims and the rod end's ball. Cut at dia 4.8
   // (cs_d - ream_stock) and reamed to 5 H7, so the pin does not hammer the hole as the rod load reverses
   p.sketch("LeverPin_Sketch", "XY", 0, (s) => {
@@ -708,11 +712,21 @@ def("shank_plate", { body: "ShankPlate", part_number: "RP-118", sym: { axis: "z"
   p.hole("FootBolt", "FootBolt_Sketch", { clearance: "M4", fit: "close" });
 });
 
-// Frame: axis Z, from z = 0 to sh_gap. Between the shank plates at the knee, round the two bushings' sleeves.
-def("shank_tube", { body: "ShankTube", part_number: "RP-119", sym: { axis: "z", about: "sh_gap/2" },
-  description: "Knee spacer tube, 14 x 10 mm aluminium tube, cut to length" }, (p) => {
-  p.sketch("Tube_Sketch", "XY", 0, (s) => { s.circle(0, 0, "sh_tube_d"); s.circle(0, 0, "sh_tube_bore"); });
-  p.extrude("Tube", "sh_gap", { op: "new" });
+// Frame: the shank plate frame on the knee axis (X forward, Y up), axis Z, from z = 0 to 2*t_plate + sh_gap: a D-shaped
+// spigot through each shank plate, the body between them. The body is cut back where the pushrod passes the knee at deep
+// folds; the spigots' flats key it so the relief stays there. The needle bearing is pressed into the bore, centred.
+// Extruded straight through, so it is symmetric about its mid-plane and the same part serves both sides.
+def("knee_hub", { body: "KneeHub", part_number: "RP-122", sym: { axis: "z", about: "(2*t_plate + sh_gap)/2" },
+  description: "Knee hub, printed PETG (solid round the bore), holds the HK0812-2RS needle bearing (press fit, bore 12) between the shank plates" }, (p) => {
+  p.sketch("SpigotIn_Sketch", "XY", 0, raw(shape.kneeKeyCmds()));
+  p.extrude("SpigotIn", "t_plate", { op: "new" });
+  p.sketch("Body_Sketch", "XY", "t_plate", raw(shape.kneeHubCmds()));
+  p.extrude("Body", "sh_gap");
+  p.sketch("SpigotOut_Sketch", "XY", "t_plate + sh_gap", raw(shape.kneeKeyCmds()));
+  p.extrude("SpigotOut", "t_plate");
+  // the bearing seat: bore nb_od through (printed to suit the press fit)
+  p.sketch("BearingSeat_Sketch", "XY", 0, (s) => s.point(0, 0));
+  p.hole("BearingSeat", "BearingSeat_Sketch", { diameter: "nb_od" });
 });
 
 def("standoff_m3x9", { body: "Standoff9", part_number: "SO-M3X9", bom_type: "purchased", sym: { axis: "z", about: "sh_gap/2" },
@@ -723,18 +737,24 @@ def("standoff_m3x9", { body: "Standoff9", part_number: "SO-M3X9", bom_type: "pur
   p.hole("Thread", "Thread_Sketch", { thread: "M3" });
 });
 
-// Frame: axis Z, the barrel from z = 0 (under its head) to cs_l, its head below z = 0, the screw head above cs_l.
-// The lever pin: barrel and screw as one body (the screw head seats on the barrel's end). Envelope: the hex sockets and
-// the M4 thread inside the barrel are not modelled. Round, so any plane through the axis is a mirror plane.
-def("chicago_screw_m4x15", { body: "ChicagoScrew", part_number: "SCR-CHI-M4X15", bom_type: "purchased", sym: { axis: "x" },
-  description: "Chicago screw (sex bolt) M4 x 15, barrel dia 5, low heads 8.5 x 1.8 and 8.3 x 1.7, steel" }, (p) => {
-  p.sketch("BarrelHead_Sketch", "XY", "-cs_h1", (s) => s.circle(0, 0, "cs_d1"));
-  p.extrude("BarrelHead", "cs_h1", { op: "new" });
-  p.sketch("Barrel_Sketch", "XY", 0, (s) => s.circle(0, 0, "cs_d"));
-  p.extrude("Barrel", "cs_l");
-  p.sketch("ScrewHead_Sketch", "XY", "cs_l", (s) => s.circle(0, 0, "cs_d2"));
-  p.extrude("ScrewHead", "cs_h2");
-});
+// Frame: axis Z, the barrel from z = 0 (under its head) to its length l, its head below z = 0, the screw head above l.
+// Barrel and screw as one body (the screw head seats on the barrel's end). Envelope: the hex sockets and the M4 thread
+// inside the barrel are not modelled. Round, so any plane through the axis is a mirror plane.
+const chicagoScrew = (key, pn, l, d1, h1, d2, h2, description) =>
+  def(key, { body: "ChicagoScrew", part_number: pn, bom_type: "purchased", sym: { axis: "x" }, description }, (p) => {
+    p.sketch("BarrelHead_Sketch", "XY", "-" + h1, (s) => s.circle(0, 0, d1));
+    p.extrude("BarrelHead", h1, { op: "new" });
+    p.sketch("Barrel_Sketch", "XY", 0, (s) => s.circle(0, 0, "cs_d"));
+    p.extrude("Barrel", l);
+    p.sketch("ScrewHead_Sketch", "XY", l, (s) => s.circle(0, 0, d2));
+    p.extrude("ScrewHead", h2);
+  });
+// the lever pin, cs_l long under its head (= 2*t_plate + sh_gap)
+chicagoScrew("chicago_screw_m4x15", "SCR-CHI-M4X15", "cs_l", "cs_d1", "cs_h1", "cs_d2", "cs_h2",
+  "Chicago screw (sex bolt) M4 x 15, barrel dia 5, low heads 8.5 x 1.8 and 8.3 x 1.7, steel");
+// the knee: modelled at the stack it clamps (2*t_plate + cav_lk, within its grip kcs_g0 to kcs_g1)
+chicagoScrew("chicago_screw_m4x25", "SCR-CHI-M4X25", "2*t_plate + cav_lk", "kcs_d1", "kcs_h", "kcs_d1", "kcs_h",
+  "Chicago screw (binding barrel and screw) M4 x 25, barrel dia 5, grip 25-27, heads about 10 x 3, stainless 18-8");
 
 // Frame: axis Z, from z = 0 to shim_t. Between the rod-end ball and each shank plate, on the lever pin.
 def("shim_5x10", { body: "Shim", part_number: "DIN988-5X10X0.5", bom_type: "purchased", sym: { axis: "x" },
@@ -743,15 +763,31 @@ def("shim_5x10", { body: "Shim", part_number: "DIN988-5X10X0.5", bom_type: "purc
   p.extrude("Shim", "shim_t", { op: "new" });
 });
 
-// Frame: axis Z, flange from z = 0 to bush_fl_t, sleeve from there to bush_fl_t + bush_l. Turns on the knee axle; the
-// flange is the thrust washer between the shank plate and the thigh plate. Round, so any plane through the axis is a
-// mirror plane.
-def("bushing_0810f", { body: "Bushing", part_number: "BUSH-0810F", bom_type: "purchased", sym: { axis: "x" },
-  description: "Flanged plain bushing 8 x 10 mm, 15 mm flange, polymer (iglidur type; exact size to confirm)" }, (p) => {
-  p.sketch("Flange_Sketch", "XY", 0, (s) => { s.circle(0, 0, "bush_fl_d"); s.circle(0, 0, "axle_d"); });
-  p.extrude("Flange", "bush_fl_t", { op: "new" });
-  p.sketch("Sleeve_Sketch", "XY", "bush_fl_t", (s) => { s.circle(0, 0, "bush_od"); s.circle(0, 0, "axle_d"); });
-  p.extrude("Sleeve", "bush_l");
+// Knee pivot hardware. Frames: axis Z, from z = 0 up. All round, so any plane through the axis is a mirror plane.
+// Drawn-cup needle bearing, envelope (cup and needles as one ring). Runs straight on the hardened knee sleeve.
+def("needle_hk0812", { body: "NeedleBearing", part_number: "HK0812-2RS", bom_type: "purchased", sym: { axis: "x" },
+  description: "Drawn-cup needle roller bearing HK0812-2RS, 8 x 12 x 12, sealed both ends (INA/SKF; C about 2.7 kN, C0 about 2.6 kN)" }, (p) => {
+  p.sketch("Ring_Sketch", "XY", 0, (s) => { s.circle(0, 0, "nb_od"); s.circle(0, 0, "axle_d"); });
+  p.extrude("Ring", "nb_l", { op: "new" });
+});
+
+// Thrust washer against each end of the knee hub; it turns against the hub or the shims.
+def("washer_m8", { body: "WasherM8", part_number: "DIN125-A-M8", bom_type: "purchased", sym: { axis: "x" },
+  description: "Flat washer DIN 125-A M8, 8.4 x 16 x 1.6, steel" }, (p) => {
+  p.sketch("Washer_Sketch", "XY", 0, (s) => { s.circle(0, 0, "tw_d"); s.circle(0, 0, "tw_bore"); });
+  p.extrude("Washer", "tw_t", { op: "new" });
+});
+
+// Shims between each thrust washer and the thigh plate: they set the knee's sideways play (adjust at assembly).
+def("shim_8x14x05", { body: "Shim8x14x05", part_number: "DIN988-8X14X0.5", bom_type: "purchased", sym: { axis: "x" },
+  description: "Shim ring DIN 988, 8 x 14 x 0.5, steel" }, (p) => {
+  p.sketch("Shim_Sketch", "XY", 0, (s) => { s.circle(0, 0, "ks_d"); s.circle(0, 0, "axle_d"); });
+  p.extrude("Shim", "ks_t1", { op: "new" });
+});
+def("shim_8x14x02", { body: "Shim8x14x02", part_number: "DIN988-8X14X0.2", bom_type: "purchased", sym: { axis: "x" },
+  description: "Shim ring DIN 988, 8 x 14 x 0.2, steel" }, (p) => {
+  p.sketch("Shim_Sketch", "XY", 0, (s) => { s.circle(0, 0, "ks_d"); s.circle(0, 0, "axle_d"); });
+  p.extrude("Shim", "ks_t2", { op: "new" });
 });
 
 // The two slots that take the shank plates' ends in the foot core and the foot pad, one per plate, symmetric about the

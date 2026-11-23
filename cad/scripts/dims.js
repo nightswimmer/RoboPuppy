@@ -98,8 +98,19 @@ module.exports = {
   // holes finished by reaming are modelled at the size they are cut (laser or drill): ream_stock under the finished
   // size, so the cut file carries the right size and the reamer has material to remove
   ream_stock: 0.2,
-  sh_tube_d: 14, sh_tube_bore: 10,             // spacer tube between the shank plates, round the knee bushings
-  bush_od: 10, bush_l: 5, bush_fl_d: 15, bush_fl_t: 1,   // flanged plain bushing 8 x 10 in each shank plate, flange toward the thigh plate
+  // knee pivot: a printed PETG hub between the shank plates holds a drawn-cup needle bearing that runs on the knee
+  // sleeve. Hub body kh_d across, cut back to kh_rel_r between kh_rel0_ang and kh_rel1_ang (shank plate frame:
+  // 0 = forward, 90 = up), where the pushrod passes 10.4 mm from the knee axis at full fold. A D-shaped spigot at each
+  // end (kh_key_d across, flat kh_key behind the axis) sits in the matching hole in each shank plate.
+  kh_d: 26, kh_rel_r: 9.3, kh_rel0_ang: -35, kh_rel1_ang: 73, kh_key_d: 18, kh_key: 7.5,
+  nb_od: 12, nb_l: 12,                         // needle bearing HK0812-2RS, 8 x 12 x 12, sealed; pressed into the hub
+  tw_d: 16, tw_bore: 8.4, tw_t: 1.6,           // thrust washer DIN 125-A M8 against each end of the hub
+  ks_d: 14, ks_t1: 0.5, ks_t2: 0.2,            // DIN 988 shims 8 x 14 between each washer and the thigh plate;
+                                               // knee play each side: sh_in - tw_t - ks_t1 - ks_t2 (0.2)
+  // knee axle: a hardened sleeve (bearing steel, 58-62 HRC, OD ground 8 0/-0.01), bore cs_d, axle_d across, cav_lk
+  // long, clamped between the thigh plates' inner faces by a Chicago screw M4 x 25 (barrel dia cs_d, grip kcs_g0 to
+  // kcs_g1) through both plates. Heads kcs_d1 x kcs_h (estimated; check against the bought screw)
+  kcs_g0: 25, kcs_g1: 27, kcs_d1: 10, kcs_h: 3,
   foot_slot_clr: 0.2,    // foot core and pad: clearance round the plate ends in their slots
 
   // ---- torso ----

@@ -113,12 +113,18 @@ const THIGH_LK = [
   [parts.hip_spacer_lk, PLATE(Y_OUT_LK)],
   [parts.robstride02, MOTOR_KNEE_LK],
   ...[1, 2, 3, 4, 5].map((i) => [parts.standoff_m3x20, AX_Y([i < 5 ? -P["lk_so_x" + i] : P["lk_so_x" + i], Y_CAV0, -P["lk_so_z" + i]])]),
-  [parts.knee_axle_lk, AX_Y([0, P.y_in, -P.lt])],
+  // knee axle: the hardened sleeve between the plates' inner faces, clamped by a Chicago screw through both plates
+  // (barrel head on the inner plate, screw head on the outer plate)
+  [parts.knee_sleeve, AX_Y([0, Y_CAV0, -P.lt])],
+  [parts.chicago_screw_m4x25, AX_Y([0, P.y_in, -P.lt])],
 ];
-// Lower leg: the two shank plates (sh_in inside the thigh plates, sh_gap apart), the tube and two spacers between them, a
-// flanged bushing in each plate (flange outward, against the thigh plate), the foot core and pad on the plate ends, and
-// the lever pin: a Chicago screw through both plates and the rod-end ball, with a shim each side of the ball (the barrel
-// head inward, the screw head outward).
+{ const g = 2 * P.t_plate + P.cav_lk;
+  if (!(g >= P.kcs_g0 && g <= P.kcs_g1)) throw new Error(`the knee stack (2*t_plate + cav_lk = ${g}) must be within the knee Chicago screw's grip (kcs_g0 to kcs_g1)`); }
+// Lower leg: the two shank plates (sh_in inside the thigh plates, sh_gap apart), the knee hub (its spigots in the plates)
+// with the needle bearing pressed in, and two spacers between the plates; each side of the hub a thrust washer and two
+// shims fill the gap to the thigh plate but for the knee play; the foot core and pad on the plate ends, and the lever
+// pin: a Chicago screw through both plates and the rod-end ball, with a shim each side of the ball (the barrel head
+// inward, the screw head outward).
 // The S-shaped plates are not symmetric front to back, so the right-hand lower leg is the mirror module (same parts).
 const Y_SH0 = Y_CAV0 + P.sh_in;                                   // 47.5: inner shank plate's inner face
 const Y_GAP = Y_SH0 + P.t_plate;                                  // 50.5: between the plates, to Y_GAP + sh_gap
@@ -128,6 +134,11 @@ const close = (a, b) => Math.abs(a - b) < 1e-9;
 if (!close(P.cs_l, 2 * P.t_plate + P.sh_gap)) throw new Error("the Chicago screw's barrel (cs_l) must equal the shank stack (2*t_plate + sh_gap)");
 if (!close(P.re_ball_w + 2 * P.shim_t, P.sh_gap)) throw new Error("the rod-end ball and its two shims (re_ball_w + 2*shim_t) must fill sh_gap");
 if (!close(Y_ROD, Y_GAP + P.sh_gap / 2)) throw new Error("the rod plane (set by the crank) must be the mid-plane between the shank plates");
+// knee play: the shank can slide this far each way before a washer stack meets its thigh plate; the lever pin's heads
+// must still clear the thigh plates then
+const KNEE_PLAY = P.sh_in - P.tw_t - P.ks_t1 - P.ks_t2;
+if (!(KNEE_PLAY > 0.05 && KNEE_PLAY < P.sh_in - Math.max(P.cs_h1, P.cs_h2) - 0.3)) throw new Error(`knee play ${KNEE_PLAY.toFixed(2)} mm each side: the washer and shims must nearly fill sh_in and leave the lever pin heads 0.3 mm or more`);
+if (!(P.nb_l <= 2 * P.t_plate + P.sh_gap)) throw new Error("the needle bearing (nb_l) must fit inside the knee hub");
 const KNEE_PLATE = (y) => mul(tr(0, 0, -P.lt), PLATE(y));
 const CL = shape.centreline();
 const FOOT_UP = (CL.footUp * Math.PI) / 180;                      // the plates' direction where they enter the foot
@@ -136,10 +147,16 @@ const FOOT = basis([-Math.sin(FOOT_UP), 0, Math.cos(FOOT_UP)], [Math.cos(FOOT_UP
 const LOWER_LK = [
   [parts.shank_plate, KNEE_PLATE(Y_GAP)],
   [parts.shank_plate, KNEE_PLATE(Y_SH1)],
-  [parts.shank_tube, AX_Y([0, Y_GAP, -P.lt])],
+  [parts.knee_hub, KNEE_PLATE(Y_SH1)],
+  [parts.needle_hk0812, AX_Y([0, Y_GAP + P.sh_gap / 2 - P.nb_l / 2, -P.lt])],
   ...[P.sh_so1, P.sh_so2].map((d) => { const [x, z] = CL.along(d).p; return [parts.standoff_m3x9, AX_Y([x, Y_GAP, z - P.lt])]; }),
-  [parts.bushing_0810f, AX_Y([0, Y_SH0 - P.bush_fl_t, -P.lt])],
-  [parts.bushing_0810f, basis([1, 0, 0], [0, 0, 1], [0, -1, 0], [0, Y_SH1 + P.bush_fl_t, -P.lt])],
+  // washer and shims, inner side (from the hub toward the inner thigh plate), then outer side
+  [parts.washer_m8, AX_Y([0, Y_SH0 - P.tw_t, -P.lt])],
+  [parts.shim_8x14x05, AX_Y([0, Y_SH0 - P.tw_t - P.ks_t1, -P.lt])],
+  [parts.shim_8x14x02, AX_Y([0, Y_SH0 - P.tw_t - P.ks_t1 - P.ks_t2, -P.lt])],
+  [parts.washer_m8, AX_Y([0, Y_SH1, -P.lt])],
+  [parts.shim_8x14x05, AX_Y([0, Y_SH1 + P.tw_t, -P.lt])],
+  [parts.shim_8x14x02, AX_Y([0, Y_SH1 + P.tw_t + P.ks_t1, -P.lt])],
   [parts.chicago_screw_m4x15, AX_Y([PIN_X, Y_SH0, PIN_Z - P.lt])],
   [parts.shim_5x10, AX_Y([PIN_X, Y_GAP, PIN_Z - P.lt])],
   [parts.shim_5x10, AX_Y([PIN_X, Y_GAP + P.sh_gap - P.shim_t, PIN_Z - P.lt])],

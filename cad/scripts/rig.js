@@ -123,11 +123,14 @@ function thigh(name, s) {
     cyl(pre + "MotorPilot", P.rs_pilot_d, [0, 0], [Y.kneeBody[0] - P.rs_pilot_h, Y.kneeBody[0]], s),
     box(pre + "PlugUp", [-P.rs_plug_w / 2, P.rs_plug_w / 2], Y.kneePlug, [P.rs_plug_r0, P.rs_plug_r1], s),
     box(pre + "PlugDown", [-P.rs_plug_w / 2, P.rs_plug_w / 2], Y.kneePlug, [-P.rs_plug_r1, -P.rs_plug_r0], s),
+    // the knee Chicago screw's heads on the plates' outer faces
+    cyl(pre + "KneeScrewIn", P.kcs_d1, [0, "-lt"], [Y.innerPlate[0] - P.kcs_h, Y.innerPlate[0]], s),
+    cyl(pre + "KneeScrewOut", P.kcs_d1, [0, "-lt"], [Y.outerPlate[1], Y.outerPlate[1] + P.kcs_h], s),
   ]);
 }
 
 // ---- shank, in a frame on the knee axis (leg Y kept): two curved plates (band and top, as the shank plate part file),
-// a tube on the axle and spacers between them, the lever pin hole through both, the foot. The curve is not symmetric
+// the knee hub body and spacers between them, the lever pin hole through both, the foot. The curve is not symmetric
 // front to back, so left and right are two definitions (the real plates are flat and serve both sides turned over). ----
 const PIN = ["lk_b * cos(90 deg + lk_ang)", "lk_b * sin(90 deg + lk_ang)"];   // lever pin, in the shank frame
 const sketchBody = (body, yr, s, inner) => {
@@ -156,7 +159,7 @@ function shank(name, s) {
     // the lever pin's heads (Chicago screw): barrel head on the inner plate, screw head on the outer plate
     cyl(pre + "PinHeadIn", P.cs_d1, PIN, [Y.shankIn[0] - P.cs_h1, Y.shankIn[0]], s),
     cyl(pre + "PinHeadOut", P.cs_d2, PIN, [Y.shankOut[1], Y.shankOut[1] + P.cs_h2], s),
-    cyl(pre + "Tube", P.sh_tube_d, [0, 0], Y.gap, s),
+    ...sketchBody(pre + "Hub", Y.gap, s, shape.kneeHubCmds()),   // knee hub body, cut back where the rod passes
     ...[P.sh_so1, P.sh_so2].map((d, i) => cyl(pre + "Spacer" + (i + 1), P.standoff_d, along(d).p.map(r4), Y.gap, s)),
     cyl(pre + "Foot", P.foot_pad_od, [0, "-ls"], Y.foot, s),
   ]);
